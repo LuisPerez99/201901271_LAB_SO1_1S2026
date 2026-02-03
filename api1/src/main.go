@@ -66,7 +66,14 @@ func callApi2Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, err := http.Get("http://" + os.Getenv("HOST_API2") + ":" + os.Getenv("PORT_API2") + "/health")
-	if err != nil || resp.StatusCode != http.StatusOK || resp.Status != "UP" {
+	if err != nil {
+		writeApiResponse(w, "API2", "ERROR: The API2 located on the VM2 is not working", false)
+		return
+	}
+	defer resp.Body.Close()
+
+	var apiHealth HealthResponse
+	if err := json.NewDecoder(resp.Body).Decode(&apiHealth); err != nil || apiHealth.Status != "UP" {
 		writeApiResponse(w, "API2", "ERROR: The API2 located on the VM2 is not working", false)
 		return
 	}
@@ -81,7 +88,14 @@ func callApi3Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, err := http.Get("http://" + os.Getenv("HOST_API3") + ":" + os.Getenv("PORT_API3") + "/health")
-	if err != nil || resp.StatusCode != http.StatusOK || resp.Status != "UP" {
+	if err != nil {
+		writeApiResponse(w, "API3", "ERROR: The API3 located on the VM3 is not working", false)
+		return
+	}
+	defer resp.Body.Close()
+
+	var apiHealth HealthResponse
+	if err := json.NewDecoder(resp.Body).Decode(&apiHealth); err != nil || apiHealth.Status != "UP" {
 		writeApiResponse(w, "API3", "ERROR: The API3 located on the VM3 is not working", false)
 		return
 	}
