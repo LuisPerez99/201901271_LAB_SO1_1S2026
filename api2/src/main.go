@@ -89,18 +89,18 @@ func callApi3Handler(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := http.Get("http://" + os.Getenv("HOST_API3") + ":" + os.Getenv("PORT_API3") + "/health")
 	if err != nil {
-		writeApiResponse(w, "API3", "ERROR: The API3 located on the VM3 is not working", false)
+		writeApiResponse(w, "API3", "ERROR: The API3 located on the VM2 is not working", false)
 		return
 	}
 	defer resp.Body.Close()
 
 	var apiHealth HealthResponse
 	if err := json.NewDecoder(resp.Body).Decode(&apiHealth); err != nil || apiHealth.Status != "UP" {
-		writeApiResponse(w, "API3", "ERROR: The API3 located on the VM3 is not working", false)
+		writeApiResponse(w, "API3", "ERROR: The API3 located on the VM2 is not working", false)
 		return
 	}
 
-	writeApiResponse(w, "API3", "The API3 located on the VM3 is working", true)
+	writeApiResponse(w, "API3", "The API3 located on the VM2 is working", true)
 }
 
 func writeApiResponse(w http.ResponseWriter, apiName, message string, connection bool) {
