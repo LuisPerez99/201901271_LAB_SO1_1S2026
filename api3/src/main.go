@@ -36,7 +36,7 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintln(w, "API2 - 201901271")
+	fmt.Fprintln(w, "API3 - 201901271")
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
@@ -50,7 +50,7 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 
 	response := HealthResponse{
 		Status:    "UP",
-		Message:   "API2 is Ready",
+		Message:   "API3 is Ready",
 		Timestamp: time.Now().Format(time.RFC3339),
 		VM:        "2",
 		Carnet:    "201901271",

@@ -52,7 +52,7 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 		Status:    "UP",
 		Message:   "API2 is Ready",
 		Timestamp: time.Now().Format(time.RFC3339),
-		VM:        "2",
+		VM:        "1",
 		Carnet:    "201901271",
 	}
 
