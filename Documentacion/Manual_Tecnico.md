@@ -21,8 +21,11 @@
 
     ```json
     {
-        "status": "ok",
-        "message": "API is healthy"
+        "status": "UP",
+        "message": "API# is Ready",
+        "timestamp": "2026-02-16T12:00:00Z",
+        "vm": "1",
+        "carnet": "201901271"
     }
     ```
 
@@ -33,7 +36,11 @@
 
     ```json
     {
-        "message": "Hello from the API!"
+        "status": "UP",
+        "message": "API# is Ready",
+        "timestamp": "2026-02-16T17:13:41Z",
+        "vm": "1",
+        "carnet": "201901271"
     }
     ```
 
