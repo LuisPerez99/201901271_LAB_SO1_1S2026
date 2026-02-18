@@ -44,6 +44,17 @@
     }
     ```
 
+#### Capturas
+
+API1
+![API1](Imagenes/api1_ss.png)
+
+API2
+![API2](Imagenes/api2_ss.png)
+
+API3
+![API3](Imagenes/api3_ss.png)
+
 ### Configuración de Máquinas Virtuales
 
 **SO:** Ubuntu Server 24.04 LTS
@@ -58,3 +69,7 @@
 ![Configuración de Máquinas Virtuales](Imagenes/vm_config_3.png)
 
 ![Configuración de Máquinas Virtuales](Imagenes/vm_config_4.png)
+
+### Instalación
+
+
