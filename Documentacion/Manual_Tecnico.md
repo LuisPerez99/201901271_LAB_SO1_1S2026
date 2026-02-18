@@ -145,19 +145,19 @@ docker push localhost:5000/api3-201901271:latest
 
 ```bash
 # En la máquina virtual 1
-sudo nerdctl pull localhost:5000/api1-201901271:latest
-sudo nerdctl pull localhost:5000/api2-201901271:latest
+sudo nerdctl image pull --insecure-registry <IP_VM3>:5000/api1-201901271:latest
+sudo nerdctl image pull --insecure-registry <IP_VM3>:5000/api2-201901271:latest
 # En la máquina virtual 2
-sudo nerdctl pull localhost:5000/api3-201901271:latest
+sudo nerdctl image pull --insecure-registry <IP_VM3>:5000/api3-201901271:latest
 ```
 
 9. Crear contenedores para las APIs en las máquinas virtuales 1 y 2:
 
 ```bash
 # En la máquina virtual 1
-sudo nerdctl run -d -p 8081:8081 --name api1-201901271 localhost:5000/api1-201901271:latest
+sudo nerdctl run -d --name api1-201901271 -p 8081:8081 <IP_VM3>:5000/api1-201901271:latest
 # En la máquina virtual 2
-sudo nerdctl run -d -p 8082:8082 --name api2-201901271 localhost:5000/api2-201901271:latest
+sudo nerdctl run -d --name api2-201901271 -p 8082:8082 <IP_VM3>:5000/api2-201901271:latest
 # En la máquina virtual 3
-sudo nerdctl run -d -p 8083:8083 --name api3-201901271 localhost:5000/api3-201901271:latest
+sudo nerdctl run -d --name api3-201901271 -p 8083:8083 <IP_VM3>:5000/api3-201901271:latest
 ```
