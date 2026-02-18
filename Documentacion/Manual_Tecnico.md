@@ -46,14 +46,47 @@
 
 #### Capturas
 
-**API1:** Request a `GET /health`, `GET /api1/201901271/call-api2` y `GET /api1/201901271/call-api3`
-![API1](Imagenes/api1_ss.png)
+**API1**
 
-**API2:** Request a `GET /health`, `GET /api2/201901271/call-api1` y `GET /api2/201901271/call-api3`
-![API2](Imagenes/api2_ss.png)
+`GET /health`
 
-**API3:** Request a `GET /health`, `GET /api3/201901271/call-api1` y `GET /api3/201901271/call-api2`
-![API3](Imagenes/api3_ss.png)
+![API1](Imagenes/api1/health.png)
+
+`GET /api1/201901271/call-api2`
+
+![API1](Imagenes/api1/call-api2.png)
+
+`GET /api1/201901271/call-api3`
+
+![API1](Imagenes/api1/call-api3.png)
+
+**API2**
+
+`GET /health`
+
+![API2](Imagenes/api2/health.png)
+
+`GET /api2/201901271/call-api1`
+
+![API2](Imagenes/api2/call-api1.png)
+
+`GET /api2/201901271/call-api3`
+
+![API2](Imagenes/api2/call-api3.png)
+
+**API3**
+
+`GET /health`
+
+![API3](Imagenes/api3/health.png)
+
+`GET /api3/201901271/call-api1`
+
+![API3](Imagenes/api3/call-api1.png)
+
+`GET /api3/201901271/call-api2`
+
+![API3](Imagenes/api3/call-api2.png)
 
 **Contenedor de Zot**
 ![Contenedor de Zot](Imagenes/zot_ss.png)
