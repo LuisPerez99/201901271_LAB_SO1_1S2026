@@ -1,0 +1,2 @@
+obj-m += continfo.o
+continfo-objs := src/main.o
