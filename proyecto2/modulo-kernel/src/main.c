@@ -21,7 +21,7 @@ static void get_cmd_or_container(struct task_struct *task, char *out, size_t out
 {
     char comm[TASK_COMM_LEN];
     get_task_comm(comm, task);
-    strscopy(out, comm, out_sz);
+    strscpy(out, comm, out_sz);
 }
 
 static int continfo_show(struct seq_file *m, void *v)
@@ -74,3 +74,42 @@ static int continfo_show(struct seq_file *m, void *v)
 
     return 0;
 }
+
+static int continfo_open(struct inode *inode, struct file *file)
+{
+    return single_open(file, continfo_show, NULL);
+}
+
+static const struct proc_ops continfo_fops = {
+    .proc_open = continfo_open,
+    .proc_read = seq_read,
+    .proc_lseek = seq_lseek,
+    .proc_release = single_release,
+};
+
+static int __init continfo_init(void)
+{
+    proc_entry = proc_create(PROC_NAME, 0444, NULL, &continfo_fops);
+    if (!proc_entry) {
+        pr_err("continfo: No se pudo crear /proc/%s\n", PROC_NAME);
+        return -ENOMEM;
+    }
+
+    pr_info("continfo: Módulo cargado, /proc/%s creado\n", PROC_NAME);
+    return 0;
+}
+
+static void __exit continfo_exit(void)
+{
+    if (proc_entry)
+        proc_remove(proc_entry);
+
+    pr_info("continfo: Módulo descargado, /proc/%s eliminado\n", PROC_NAME);
+}
+
+module_init(continfo_init);
+module_exit(continfo_exit);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("201901271");
+MODULE_DESCRIPTION("Kernel module: monitor de procesos y memoria en /proc/continfo_pr2_so1_201901271");
