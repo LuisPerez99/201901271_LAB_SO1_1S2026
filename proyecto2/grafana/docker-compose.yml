@@ -1,0 +1,37 @@
+services:
+  valkey:
+    image: valkey/valkey:latest
+    container_name: valkey
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - valkey_data:/data
+    networks:
+      - monitoring
+  
+  grafana:
+    build: .
+    container_name: grafana
+    restart: unless-stopped
+    depends_on:
+      - valkey
+    ports:
+      - "3000:3000"
+    user: "0"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - monitoring
+
+volumes:
+  valkey_data:
+  grafana_data:
+
+networks:
+  monitoring:
+    driver: bridge
+    
