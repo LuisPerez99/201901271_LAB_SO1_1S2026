@@ -9,14 +9,16 @@ import (
 )
 
 type ContainerInfo struct {
-	ID     string
-	Name   string
-	PID    int
-	RAM    uint64  // RAM usage in KB
-	VSZ    uint64  // Virtual memory size in KB
-	RSS    uint64  // Physical memory in KB
-	CPU    float64 // CPU usage percentage
-	IsHigh bool    // true = high usage, false = low usage
+	ID        string
+	Name      string
+	Command   string
+	PID       int
+	RAM       uint64  // Compatible metric for sorting/storage; mirrors RSS from /proc.
+	VSZ       uint64  // Virtual memory size in KB
+	RSS       uint64  // Physical memory in KB
+	MemoryPct float64 // Memory usage percentage
+	CPU       float64 // CPU usage percentage
+	IsHigh    bool    // true = high usage, false = low usage
 }
 
 // Leer la información de los contenedores desde el archivo /proc/continfo_pr2_so1_201901271
@@ -33,7 +35,7 @@ func ReadContainerInfo(path string) ([]ContainerInfo, error) {
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 
-		if line == "" || strings.HasPrefix(line, "#") {
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "Memoria total:") || strings.HasPrefix(line, "PID\t") {
 			continue
 		}
 
@@ -42,24 +44,43 @@ func ReadContainerInfo(path string) ([]ContainerInfo, error) {
 			continue
 		}
 
-		pid, _ := strconv.Atoi(fields[2])
-		ram, _ := strconv.ParseUint(fields[3], 10, 64)
-		vsz, _ := strconv.ParseUint(fields[4], 10, 64)
-		rss, _ := strconv.ParseUint(fields[5], 10, 64)
-		cpu, _ := strconv.ParseFloat(fields[6], 64)
-
-		container := ContainerInfo{
-			ID:   fields[0],
-			Name: fields[1],
-			PID:  pid,
-			RAM:  ram,
-			VSZ:  vsz,
-			RSS:  rss,
-			CPU:  cpu,
+		pid, err := strconv.Atoi(fields[0])
+		if err != nil {
+			continue
 		}
 
-		// Clasificar basado en el nombre del contenedor
-		container.IsHigh = isHighUsage(container.Name)
+		vsz, err := strconv.ParseUint(fields[3], 10, 64)
+		if err != nil {
+			continue
+		}
+
+		rss, err := strconv.ParseUint(fields[4], 10, 64)
+		if err != nil {
+			continue
+		}
+
+		memPct, err := parsePercent(fields[5])
+		if err != nil {
+			memPct = 0
+		}
+
+		cpu, err := parsePercent(fields[6])
+		if err != nil {
+			cpu = 0
+		}
+
+		container := ContainerInfo{
+			ID:        fields[0],
+			Name:      fields[1],
+			Command:   fields[2],
+			PID:       pid,
+			RAM:       rss,
+			VSZ:       vsz,
+			RSS:       rss,
+			MemoryPct: memPct,
+			CPU:       cpu,
+		}
+
 		containers = append(containers, container)
 	}
 
@@ -70,7 +91,7 @@ func ReadContainerInfo(path string) ([]ContainerInfo, error) {
 	return containers, nil
 }
 
-// Determinar si el contenedor es de alto o bajo consumo basado en su nombre
-func isHighUsage(name string) bool {
-	return strings.Contains(name, "go-client") || strings.Contains(name, "high")
+func parsePercent(value string) (float64, error) {
+	clean := strings.TrimSuffix(strings.TrimSpace(value), "%")
+	return strconv.ParseFloat(clean, 64)
 }

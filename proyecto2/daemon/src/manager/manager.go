@@ -1,11 +1,12 @@
 package manager
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os/exec"
-	"slices"
 	"sort"
+	"strings"
 
 	"daemon-proyecto2/src/parser"
 )
@@ -15,21 +16,35 @@ const (
 	TARGET_HIGH = 2
 )
 
+const cronJobLabel = "app=pr2-cronjob"
+
 // Contenedores protegidos que no deben ser eliminados por el daemon
-var protectedContainers = []string{"grafana grafana", "valkey-server"}
+var protectedContainers = []string{"grafana", "valkey"}
+
+type dockerInspect struct {
+	ID    string `json:"Id"`
+	Name  string `json:"Name"`
+	State struct {
+		Pid int `json:"Pid"`
+	} `json:"State"`
+	Config struct {
+		Image  string            `json:"Image"`
+		Cmd    []string          `json:"Cmd"`
+		Labels map[string]string `json:"Labels"`
+	} `json:"Config"`
+}
 
 // Manejar las políticas de gestión de contenedores según su uso (alto o bajo)
-func Manage(containers []parser.ContainerInfo) error {
-	// Filtrar contenedores protegidos
-	var managed []parser.ContainerInfo
-	for _, c := range containers {
-		if !isProtected(c.Name) {
-			managed = append(managed, c)
-		}
+func Manage(containers []parser.ContainerInfo) ([]parser.ContainerInfo, error) {
+	dockerContainers, err := resolveManagedContainers(containers)
+	if err != nil {
+		return nil, err
 	}
 
+	log.Printf("[manager] Docker containers matched from /proc: %d", len(dockerContainers))
+
 	// Dividir en grupos de alto y bajo consumo
-	high, low := splitByUsage(managed)
+	high, low := splitByUsage(dockerContainers)
 
 	log.Printf("[manager] High usage containers: %d (target: %d)", len(high), TARGET_HIGH)
 	log.Printf("[manager] Low usage containers: %d (target: %d)", len(low), TARGET_LOW)
@@ -40,15 +55,20 @@ func Manage(containers []parser.ContainerInfo) error {
 
 	// Manejar contenedores de alto consumo
 	if err := enforceLimit(high, TARGET_HIGH, "high"); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Manejar contenedores de bajo consumo
 	if err := enforceLimit(low, TARGET_LOW, "low"); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	remaining, err := resolveManagedContainers(containers)
+	if err != nil {
+		return nil, err
+	}
+
+	return remaining, nil
 }
 
 // Eliminar contenedores excedentes para cumplir con el objetivo, priorizando los de mayor consumo
@@ -70,6 +90,102 @@ func enforceLimit(containers []parser.ContainerInfo, target int, label string) e
 	}
 
 	return nil
+}
+
+func resolveManagedContainers(processes []parser.ContainerInfo) ([]parser.ContainerInfo, error) {
+	inspected, err := listCronJobContainers()
+	if err != nil {
+		return nil, err
+	}
+
+	byPID := make(map[int]dockerInspect, len(inspected))
+	for _, container := range inspected {
+		if container.State.Pid <= 0 {
+			continue
+		}
+		byPID[container.State.Pid] = container
+	}
+
+	managed := make([]parser.ContainerInfo, 0, len(processes))
+	for _, proc := range processes {
+		container, ok := byPID[proc.PID]
+		if !ok {
+			continue
+		}
+
+		name := strings.TrimPrefix(container.Name, "/")
+		if isProtected(name) {
+			continue
+		}
+
+		proc.ID = container.ID
+		proc.Name = name
+		proc.IsHigh = isHighUsageContainer(container)
+		managed = append(managed, proc)
+	}
+
+	return managed, nil
+}
+
+func listCronJobContainers() ([]dockerInspect, error) {
+	psCmd := exec.Command("docker", "ps", "-aq", "--filter", "label="+cronJobLabel)
+	out, err := psCmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("docker ps failed: %w", err)
+	}
+
+	ids := strings.Fields(string(out))
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	args := append([]string{"inspect"}, ids...)
+	inspectCmd := exec.Command("docker", args...)
+	inspectOut, err := inspectCmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("docker inspect failed: %w", err)
+	}
+
+	var containers []dockerInspect
+	if err := json.Unmarshal(inspectOut, &containers); err != nil {
+		return nil, fmt.Errorf("error parsing docker inspect output: %w", err)
+	}
+
+	return containers, nil
+}
+
+func RemoveAllCronJobContainers() error {
+	containers, err := listCronJobContainers()
+	if err != nil {
+		return err
+	}
+
+	for _, container := range containers {
+		name := strings.TrimPrefix(container.Name, "/")
+		if isProtected(name) {
+			continue
+		}
+
+		log.Printf("[manager] Removing cronjob container on shutdown: %s", name)
+		if err := stopAndRemove(container.ID); err != nil {
+			log.Printf("[manager] Warning: failed to remove %s during shutdown: %v", name, err)
+		}
+	}
+
+	return nil
+}
+
+func isHighUsageContainer(container dockerInspect) bool {
+	if strings.Contains(container.Config.Image, "roldyoran/go-client") {
+		return true
+	}
+
+	cmd := strings.Join(container.Config.Cmd, " ")
+	if strings.Contains(cmd, "sleep 240") {
+		return false
+	}
+
+	return true
 }
 
 // Ordenar contenedores por uso de recursos (RAM, VSZ, RSS, CPU) de mayor a menor
@@ -119,5 +235,10 @@ func stopAndRemove(id string) error {
 
 // Verificar si un contenedor está en la lista de protegidos para evitar su eliminación por el daemon
 func isProtected(name string) bool {
-	return slices.Contains(protectedContainers, name)
+	for _, protected := range protectedContainers {
+		if name == protected {
+			return true
+		}
+	}
+	return false
 }

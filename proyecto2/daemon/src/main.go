@@ -77,15 +77,15 @@ func runIteration(valkeyClient *db.Client) error {
 		return fmt.Errorf("error al leer el archivo proc: %w", err)
 	}
 
-	log.Printf("[daemon] Encontrados %d contenedores, guardando estadísticas...", len(containers))
-
-	// Manejar contenedores
-	if err := manager.Manage(containers); err != nil {
+	managedContainers, err := manager.Manage(containers)
+	if err != nil {
 		return fmt.Errorf("error al manejar contenedores: %w", err)
 	}
 
+	log.Printf("[daemon] Guardando estadísticas de %d contenedores del cronjob...", len(managedContainers))
+
 	// Guardar logs en Valkey
-	if err := valkeyClient.SaveContainerStats(containers); err != nil {
+	if err := valkeyClient.SaveContainerStats(managedContainers); err != nil {
 		return fmt.Errorf("error al guardar estadísticas en Valkey: %w", err)
 	}
 
@@ -96,6 +96,10 @@ func shutdown() {
 	log.Println("[daemon] Deteniendo cronjob...")
 	if err := cron.StopCronJob(); err != nil {
 		log.Printf("[daemon] Error al detener cronjob: %v", err)
+	}
+
+	if err := manager.RemoveAllCronJobContainers(); err != nil {
+		log.Printf("[daemon] Error al eliminar contenedores del cronjob: %v", err)
 	}
 
 	if err := module.UnloadModule(); err != nil {

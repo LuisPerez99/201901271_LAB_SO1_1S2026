@@ -25,7 +25,7 @@ func StartCronJob() error {
 		return nil
 	}
 
-	log.Printf("[cron] Iniciando cronjob manual (cada %v)...", CRON_INTERVAL)
+	log.Printf("[cron] Iniciando cronjob (cada %v)...", CRON_INTERVAL)
 
 	stopChan = make(chan struct{})
 	running = true
@@ -63,7 +63,7 @@ func StopCronJob() error {
 		return nil
 	}
 
-	log.Printf("[cron] Deteniendo cronjob manual...")
+	log.Printf("[cron] Deteniendo cronjob...")
 	running = false
 	close(stopChan)
 
