@@ -5,69 +5,95 @@ import (
 	"log"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 const (
-	CRON_SCRIPT = "/home/pdrpm/SOPES1/LAB_SO1_1S2026/proyecto2/cronjob/crear-containers.sh"
-	CRON_ENTRY  = "*/2 * * * * " + CRON_SCRIPT + " >> /tmp/cronjob.log 2>&1"
+	CRON_SCRIPT   = "/home/pdrpm/SOPES1/LAB_SO1_1S2026/proyecto2/cronjob/crear-containers.sh"
+	CRON_INTERVAL = 2 * time.Minute
 )
 
-// Agregar la tarea al crontab
-func AddCronJob() error {
-	log.Printf("[cron] Agregando tarea al crontab: %s", CRON_ENTRY)
+var (
+	stopChan chan struct{}
+	running  = false
+)
 
-	// Obtener el crontab actual
-	out, err := exec.Command("crontab", "-l").Output()
-
-	// Verificar si la tarea ya existe
-	if strings.Contains(string(out), CRON_SCRIPT) {
-		log.Printf("[cron] La tarea ya existe en el crontab")
+// StartCronJob inicia la ejecución manual del cronjob cada 2 minutos en background
+func StartCronJob() error {
+	if running {
+		log.Printf("[cron] Cronjob ya está ejecutándose")
 		return nil
 	}
 
-	// Agregar la nueva tarea al crontab
-	newCrontab := string(out) + CRON_ENTRY + "\n"
+	log.Printf("[cron] Iniciando cronjob manual (cada %v)...", CRON_INTERVAL)
 
-	cmd := exec.Command("crontab", "-")
-	cmd.Stdin = strings.NewReader(newCrontab)
+	stopChan = make(chan struct{})
+	running = true
 
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("error al agregar la tarea al crontab: %v, salida: %s", err, string(out))
+	// Ejecutar script inmediatamente
+	if err := runCronScript(); err != nil {
+		log.Printf("[cron] Warning: error en ejecución inicial: %v", err)
 	}
 
-	log.Printf("[cron] Tarea agregada al crontab exitosamente")
+	// Iniciar gorrutina que ejecuta el script cada 2 minutos
+	go func() {
+		ticker := time.NewTicker(CRON_INTERVAL)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				if err := runCronScript(); err != nil {
+					log.Printf("[cron] Error ejecutando cronjob: %v", err)
+				}
+			case <-stopChan:
+				log.Printf("[cron] Cronjob detenido")
+				return
+			}
+		}
+	}()
+
 	return nil
 }
 
-// Eliminar la tarea del crontab
-func RemoveCronJob() error {
-	log.Printf("[cron] Eliminando tarea del crontab: %s", CRON_ENTRY)
-
-	// Obtener el crontab actual
-	out, err := exec.Command("crontab", "-l").Output()
-	if err != nil {
-		return fmt.Errorf("error al obtener el crontab: %v, salida: %s", err, string(out))
+// StopCronJob detiene la ejecución del cronjob
+func StopCronJob() error {
+	if !running {
+		log.Printf("[cron] Cronjob no está ejecutándose")
+		return nil
 	}
 
-	// Eliminar la tarea del crontab
-	lines := strings.Split(string(out), "\n")
-	var filtered []string
-	for _, line := range lines {
-		if !strings.Contains(line, CRON_SCRIPT) {
-			filtered = append(filtered, line)
-		}
-	}
+	log.Printf("[cron] Deteniendo cronjob manual...")
+	running = false
+	close(stopChan)
 
-	newCrontab := strings.Join(filtered, "\n")
-	cmd := exec.Command("crontab", "-")
-	cmd.Stdin = strings.NewReader(newCrontab)
-
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("error al eliminar la tarea del crontab: %v, salida: %s", err, string(out))
-	}
-
-	log.Printf("[cron] Tarea eliminada del crontab exitosamente")
 	return nil
+}
+
+// runCronScript ejecuta el script de creación de contenedores
+func runCronScript() error {
+	log.Printf("[cron] Ejecutando script: %s", CRON_SCRIPT)
+
+	cmd := exec.Command("bash", CRON_SCRIPT)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("error al ejecutar cronjob script: %w\noutput: %s", err, string(out))
+	}
+
+	log.Printf("[cron] Script ejecutado exitosamente")
+	if len(out) > 0 {
+		log.Printf("[cron] Output: %s", strings.TrimSpace(string(out)))
+	}
+
+	return nil
+}
+
+// AddCronJob (deprecated) - mantenido por compatibilidad
+func AddCronJob() error {
+	return StartCronJob()
+}
+
+// RemoveCronJob (deprecated) - mantenido por compatibilidad
+func RemoveCronJob() error {
+	return StopCronJob()
 }

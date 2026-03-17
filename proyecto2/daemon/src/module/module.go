@@ -8,7 +8,7 @@ import (
 	"runtime"
 )
 
-const MODULE_NAME = "continfo_pr2_so1_201901271"
+const MODULE_NAME = "continfo"
 
 func modulePath() string {
 	_, file, _, _ := runtime.Caller(0)

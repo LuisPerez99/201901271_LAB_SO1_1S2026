@@ -16,7 +16,7 @@ const (
 )
 
 // Contenedores protegidos que no deben ser eliminados por el daemon
-var protectedContainers = []string{"grafana", "valkey"}
+var protectedContainers = []string{"grafana grafana", "valkey-server"}
 
 // Manejar las políticas de gestión de contenedores según su uso (alto o bajo)
 func Manage(containers []parser.ContainerInfo) error {
