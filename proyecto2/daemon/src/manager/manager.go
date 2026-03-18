@@ -7,7 +7,9 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
+	"time"
 
+	"daemon-proyecto2/src/db"
 	"daemon-proyecto2/src/parser"
 )
 
@@ -35,10 +37,10 @@ type dockerInspect struct {
 }
 
 // Manejar las políticas de gestión de contenedores según su uso (alto o bajo)
-func Manage(containers []parser.ContainerInfo) ([]parser.ContainerInfo, error) {
+func Manage(containers []parser.ContainerInfo) ([]parser.ContainerInfo, *db.DeletionStats, error) {
 	dockerContainers, err := resolveManagedContainers(containers)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	log.Printf("[manager] Docker containers matched from /proc: %d", len(dockerContainers))
@@ -53,26 +55,31 @@ func Manage(containers []parser.ContainerInfo) ([]parser.ContainerInfo, error) {
 	sortContainers(high)
 	sortContainers(low)
 
+	stats := &db.DeletionStats{
+		Timestamp: time.Now().Unix(),
+		Deleted:   make([]map[string]interface{}, 0),
+	}
+
 	// Manejar contenedores de alto consumo
-	if err := enforceLimit(high, TARGET_HIGH, "high"); err != nil {
-		return nil, err
+	if err := enforceLimit(high, TARGET_HIGH, "high", stats); err != nil {
+		return nil, nil, err
 	}
 
 	// Manejar contenedores de bajo consumo
-	if err := enforceLimit(low, TARGET_LOW, "low"); err != nil {
-		return nil, err
+	if err := enforceLimit(low, TARGET_LOW, "low", stats); err != nil {
+		return nil, nil, err
 	}
 
 	remaining, err := resolveManagedContainers(containers)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return remaining, nil
+	return remaining, stats, nil
 }
 
 // Eliminar contenedores excedentes para cumplir con el objetivo, priorizando los de mayor consumo
-func enforceLimit(containers []parser.ContainerInfo, target int, label string) error {
+func enforceLimit(containers []parser.ContainerInfo, target int, label string, stats *db.DeletionStats) error {
 	if len(containers) <= target {
 		return nil
 	}
@@ -86,6 +93,23 @@ func enforceLimit(containers []parser.ContainerInfo, target int, label string) e
 
 		if err := stopAndRemove(c.ID); err != nil {
 			log.Printf("[manager] Warning: failed to remove %s: %v", c.Name, err)
+			continue
+		}
+
+		entry := map[string]interface{}{
+			"name": c.Name,
+			"type": label,
+			"ram":  c.RAM,
+			"vsz":  c.VSZ,
+			"rss":  c.RSS,
+			"cpu":  c.CPU,
+		}
+		stats.Deleted = append(stats.Deleted, entry)
+		stats.TotalCount++
+		if label == "high" {
+			stats.HighRemoved++
+		} else {
+			stats.LowRemoved++
 		}
 	}
 

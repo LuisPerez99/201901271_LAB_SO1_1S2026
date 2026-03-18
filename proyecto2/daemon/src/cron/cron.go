@@ -87,13 +87,3 @@ func runCronScript() error {
 
 	return nil
 }
-
-// AddCronJob (deprecated) - mantenido por compatibilidad
-func AddCronJob() error {
-	return StartCronJob()
-}
-
-// RemoveCronJob (deprecated) - mantenido por compatibilidad
-func RemoveCronJob() error {
-	return StopCronJob()
-}

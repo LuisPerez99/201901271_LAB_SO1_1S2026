@@ -71,21 +71,27 @@ func main() {
 func runIteration(valkeyClient *db.Client) error {
 	log.Println("[daemon] Leyendo archivo proc...")
 
+	memoryInfo, err := parser.ReadSystemMemoryInfo(PROC_FILE)
+	if err != nil {
+		log.Printf("[daemon] Warning: no se pudo leer memoria del sistema: %v", err)
+	}
+
 	// Leer la información de los contenedores desde el archivo proc
 	containers, err := parser.ReadContainerInfo(PROC_FILE)
 	if err != nil {
 		return fmt.Errorf("error al leer el archivo proc: %w", err)
 	}
 
-	managedContainers, err := manager.Manage(containers)
+	managedContainers, deletionStats, err := manager.Manage(containers)
 	if err != nil {
 		return fmt.Errorf("error al manejar contenedores: %w", err)
 	}
 
-	log.Printf("[daemon] Guardando estadísticas de %d contenedores del cronjob...", len(managedContainers))
+	log.Printf("[daemon] Guardando estadísticas de %d contenedores del cronjob (eliminados: %d)...",
+		len(managedContainers), deletionStats.TotalCount)
 
 	// Guardar logs en Valkey
-	if err := valkeyClient.SaveContainerStats(managedContainers); err != nil {
+	if err := valkeyClient.SaveContainerStats(managedContainers, memoryInfo, deletionStats); err != nil {
 		return fmt.Errorf("error al guardar estadísticas en Valkey: %w", err)
 	}
 

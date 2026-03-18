@@ -12,10 +12,35 @@ import (
 )
 
 const (
-	STATS_KEY   = "container:stats"
-	HISTORY_KEY = "container:history"
-	MAX_HISTORY = 100
+	STATS_KEY                 = "container:stats"
+	HISTORY_KEY               = "container:history"
+	FLAT_HISTORY_KEY          = "container:flat:history"
+	SYSTEM_MEMORY_KEY         = "system:memory"
+	SYSTEM_MEMORY_HISTORY_KEY = "system:memory:history"
+	DELETIONS_HISTORY_KEY     = "container:deletions:history"
+	MAX_HISTORY               = 100
+	MAX_FLAT_HISTORY          = 1000
 )
+
+type DeletionStats struct {
+	Timestamp   int64                    `json:"timestamp"`
+	TotalCount  int                      `json:"total_count"`
+	HighRemoved int                      `json:"high_removed"`
+	LowRemoved  int                      `json:"low_removed"`
+	Deleted     []map[string]interface{} `json:"deleted"`
+}
+
+type FlatContainerMetric struct {
+	Timestamp int64   `json:"timestamp"`
+	ID        string  `json:"id"`
+	Name      string  `json:"name"`
+	PID       int     `json:"pid"`
+	RAM       uint64  `json:"ram"`
+	VSZ       uint64  `json:"vsz"`
+	RSS       uint64  `json:"rss"`
+	CPU       float64 `json:"cpu"`
+	IsHigh    bool    `json:"is_high"`
+}
 
 type Client struct {
 	rdb *redis.Client
@@ -42,14 +67,15 @@ func NewClient(addr string) (*Client, error) {
 }
 
 // Guardar las estadísticas actuales de los contenedores en Valkey
-func (c *Client) SaveContainerStats(containers []parser.ContainerInfo) error {
+func (c *Client) SaveContainerStats(containers []parser.ContainerInfo, memory parser.SystemMemoryInfo, deletionStats *DeletionStats) error {
 	timestamp := time.Now().Unix()
 
 	// Guardar las estadísticas actuales en Valkey
 	snapshot := map[string]interface{}{
-		"timestamp":  timestamp,
-		"containers": containers,
-		"total":      len(containers),
+		"timestamp":     timestamp,
+		"containers":    containers,
+		"total":         len(containers),
+		"system_memory": memory,
 	}
 
 	data, err := json.Marshal(snapshot)
@@ -61,6 +87,24 @@ func (c *Client) SaveContainerStats(containers []parser.ContainerInfo) error {
 		return fmt.Errorf("error al guardar las estadísticas en Valkey: %w", err)
 	}
 
+	memoryData, err := json.Marshal(map[string]interface{}{
+		"timestamp": timestamp,
+		"total_mb":  memory.TotalMB,
+		"free_mb":   memory.FreeMB,
+		"used_mb":   memory.UsedMB,
+	})
+	if err != nil {
+		return fmt.Errorf("error al serializar la memoria del sistema: %w", err)
+	}
+
+	if err := c.rdb.Set(c.ctx, SYSTEM_MEMORY_KEY, memoryData, 0).Err(); err != nil {
+		return fmt.Errorf("error al guardar la memoria del sistema en Valkey: %w", err)
+	}
+
+	if err := c.SaveSystemMemoryHistory(memoryData); err != nil {
+		return err
+	}
+
 	// Guardar el historial de estadísticas
 	if err := c.rdb.LPush(c.ctx, HISTORY_KEY, data).Err(); err != nil {
 		return fmt.Errorf("error al guardar el historial en Valkey: %w", err)
@@ -69,6 +113,26 @@ func (c *Client) SaveContainerStats(containers []parser.ContainerInfo) error {
 	// Limitar el historial a MAX_HISTORY entradas
 	if err := c.rdb.LTrim(c.ctx, HISTORY_KEY, 0, MAX_HISTORY-1).Err(); err != nil {
 		return fmt.Errorf("error al limitar el historial en Valkey: %w", err)
+	}
+
+	if err := c.SaveFlatContainerHistory(timestamp, containers); err != nil {
+		return err
+	}
+
+	// Guardar estadísticas de eliminaciones
+	if deletionStats != nil && deletionStats.TotalCount > 0 {
+		deletionData, err := json.Marshal(deletionStats)
+		if err != nil {
+			log.Printf("[db] Warning: error al serializar estadísticas de eliminaciones: %w", err)
+		} else {
+			if err := c.rdb.LPush(c.ctx, DELETIONS_HISTORY_KEY, deletionData).Err(); err != nil {
+				log.Printf("[db] Warning: error al guardar historial de eliminaciones: %w", err)
+			}
+
+			if err := c.rdb.LTrim(c.ctx, DELETIONS_HISTORY_KEY, 0, MAX_HISTORY-1).Err(); err != nil {
+				log.Printf("[db] Warning: error al limitar historial de eliminaciones: %w", err)
+			}
+		}
 	}
 
 	for _, cont := range containers {
@@ -87,7 +151,57 @@ func (c *Client) SaveContainerStats(containers []parser.ContainerInfo) error {
 		}
 	}
 
-	log.Printf("[guardar] Estadísticas guardadas en Valkey con timestamp %d", timestamp)
+	deletedCount := 0
+	if deletionStats != nil {
+		deletedCount = deletionStats.TotalCount
+	}
+
+	log.Printf("[guardar] Estadísticas guardadas en Valkey (eliminados: %d)", deletedCount)
+	return nil
+}
+
+// SaveFlatContainerHistory guarda una fila por contenedor para facilitar agregaciones históricas en Grafana.
+func (c *Client) SaveFlatContainerHistory(timestamp int64, containers []parser.ContainerInfo) error {
+	for _, cont := range containers {
+		row := FlatContainerMetric{
+			Timestamp: timestamp,
+			ID:        cont.ID,
+			Name:      cont.Name,
+			PID:       cont.PID,
+			RAM:       cont.RAM,
+			VSZ:       cont.VSZ,
+			RSS:       cont.RSS,
+			CPU:       cont.CPU,
+			IsHigh:    cont.IsHigh,
+		}
+
+		rowData, err := json.Marshal(row)
+		if err != nil {
+			return fmt.Errorf("error al serializar fila flat del contenedor %s: %w", cont.Name, err)
+		}
+
+		if err := c.rdb.LPush(c.ctx, FLAT_HISTORY_KEY, rowData).Err(); err != nil {
+			return fmt.Errorf("error al guardar fila flat del contenedor %s en Valkey: %w", cont.Name, err)
+		}
+	}
+
+	if err := c.rdb.LTrim(c.ctx, FLAT_HISTORY_KEY, 0, MAX_FLAT_HISTORY-1).Err(); err != nil {
+		return fmt.Errorf("error al limitar el historial flat en Valkey: %w", err)
+	}
+
+	return nil
+}
+
+// SaveSystemMemoryHistory guarda un punto histórico de memoria del sistema en Valkey.
+func (c *Client) SaveSystemMemoryHistory(memoryData []byte) error {
+	if err := c.rdb.LPush(c.ctx, SYSTEM_MEMORY_HISTORY_KEY, memoryData).Err(); err != nil {
+		return fmt.Errorf("error al guardar el historial de memoria del sistema en Valkey: %w", err)
+	}
+
+	if err := c.rdb.LTrim(c.ctx, SYSTEM_MEMORY_HISTORY_KEY, 0, MAX_HISTORY-1).Err(); err != nil {
+		return fmt.Errorf("error al limitar el historial de memoria del sistema en Valkey: %w", err)
+	}
+
 	return nil
 }
 
