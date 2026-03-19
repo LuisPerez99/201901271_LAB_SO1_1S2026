@@ -40,7 +40,7 @@ create_containers() {
             docker run -d --name "$container_name" --label app=pr2-cronjob roldyoran/go-client >/dev/null
             ;;
         "high-alpine-cpu")
-            docker run -d --name "$container_name" --label app=pr2-cronjob alpine sh -c "while true; do echo '2^20' | bc > /dev/null; sleep 2; done" >/dev/null
+            docker run -d --name "$container_name" --label app=pr2-cronjob alpine sh -c "while true; do echo '2^20' | bc > /dev/null; sleep 1; done" >/dev/null
             ;;
         "low-alpine-sleep")
             docker run -d --name "$container_name" --label app=pr2-cronjob alpine sleep 240 >/dev/null

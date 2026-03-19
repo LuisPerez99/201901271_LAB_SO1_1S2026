@@ -3,6 +3,7 @@
 #include <linux/module.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <linux/sched.h>
 #include <linux/sched/signal.h>
 #include <linux/mm.h>
 #include <linux/sysinfo.h>
@@ -29,6 +30,7 @@ static int continfo_show(struct seq_file *m, void *v)
     struct sysinfo info;
     unsigned long long total_ram, free_ram, used_ram; // ram in bytes
     unsigned long long uptime_j = get_jiffies_64();
+    unsigned long long uptime_ns;
     struct task_struct *task;
 
     si_meminfo(&info);
@@ -36,6 +38,7 @@ static int continfo_show(struct seq_file *m, void *v)
     total_ram = info.totalram * info.mem_unit / (1024 * 1024); // Convert to megabytes
     free_ram = info.freeram * info.mem_unit / (1024 * 1024); // Convert to megabytes
     used_ram = total_ram - free_ram; // Calculate used RAM
+    uptime_ns = jiffies_to_nsecs(uptime_j);
 
     seq_printf(m, "Memoria total: %llu MB, Memoria libre: %llu MB, Memoria usada: %llu MB\n", total_ram, free_ram, used_ram);
     
@@ -43,9 +46,9 @@ static int continfo_show(struct seq_file *m, void *v)
 
     for_each_process(task) {
         struct mm_struct *mm;
-        unsigned long vsz_kb, rss_kb;
-        unsigned long long mem_pct_x100, cpu_pct;
-        unsigned long long proc_time;
+        unsigned long vsz_kb = 0, rss_kb = 0;
+        unsigned long long mem_pct_x100, cpu_pct_x100;
+        unsigned long long proc_time_ns;
         char cmd_or_container[128];
 
         get_cmd_or_container(task, cmd_or_container, sizeof(cmd_or_container));
@@ -62,14 +65,22 @@ static int continfo_show(struct seq_file *m, void *v)
         } else {
             mem_pct_x100 = 0;
         }
-        seq_printf(m, "%d\t%s\t%s\t%lu\t%lu\t%llu.%02llu%%\t%llu\n",
+
+        proc_time_ns = task->se.sum_exec_runtime;
+        if (uptime_ns > 0) {
+            cpu_pct_x100 = mul_u64_u64_div_u64(proc_time_ns, 10000ULL, uptime_ns);
+        } else {
+            cpu_pct_x100 = 0;
+        }
+
+        seq_printf(m, "%d\t%s\t%s\t%lu\t%lu\t%llu.%02llu%%\t%llu.%02llu%%\n",
                    task->pid,
                    task->comm,
                    cmd_or_container,
                    vsz_kb,
                    rss_kb,
                    mem_pct_x100 / 100, mem_pct_x100 % 100,
-                   cpu_pct);
+                   cpu_pct_x100 / 100, cpu_pct_x100 % 100);
     }
 
     return 0;
