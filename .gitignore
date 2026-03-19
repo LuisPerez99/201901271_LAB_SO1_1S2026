@@ -39,4 +39,6 @@ proyecto2/modulo-kernel/main
 .main.o.d
 build
 .vscode
+daemon.log
+daemon.pid
 

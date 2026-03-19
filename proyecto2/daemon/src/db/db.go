@@ -62,7 +62,7 @@ func NewClient(addr string) (*Client, error) {
 		return nil, fmt.Errorf("error al conectar a Valkey en %s: %w", addr, err)
 	}
 
-	log.Printf("[store] Conectado a valkey en %s", addr)
+	log.Printf("[db] Conectado a valkey en %s", addr)
 	return &Client{rdb: rdb, ctx: ctx}, nil
 }
 
@@ -156,7 +156,7 @@ func (c *Client) SaveContainerStats(containers []parser.ContainerInfo, memory pa
 		deletedCount = deletionStats.TotalCount
 	}
 
-	log.Printf("[guardar] Estadísticas guardadas en Valkey (eliminados: %d)", deletedCount)
+	log.Printf("[db] Estadísticas guardadas en Valkey (eliminados: %d)", deletedCount)
 	return nil
 }
 
