@@ -43,13 +43,13 @@ func Manage(containers []parser.ContainerInfo) ([]parser.ContainerInfo, *db.Dele
 		return nil, nil, err
 	}
 
-	log.Printf("[manager] Docker containers matched from /proc: %d", len(dockerContainers))
+	log.Printf("[manager] Contenedores Docker encontrados desde /proc: %d", len(dockerContainers))
 
 	// Dividir en grupos de alto y bajo consumo
 	high, low := splitByUsage(dockerContainers)
 
-	log.Printf("[manager] High usage containers: %d (target: %d)", len(high), TARGET_HIGH)
-	log.Printf("[manager] Low usage containers: %d (target: %d)", len(low), TARGET_LOW)
+	log.Printf("[manager] Contenedores de alto consumo: %d (objetivo: %d)", len(high), TARGET_HIGH)
+	log.Printf("[manager] Contenedores de bajo consumo: %d (objetivo: %d)", len(low), TARGET_LOW)
 
 	// Ordenar cada grupo por uso de recursos (RAM, VSZ, RSS, CPU) para eliminar los más costosos primero
 	sortContainers(high)
@@ -88,11 +88,11 @@ func enforceLimit(containers []parser.ContainerInfo, target int, label string, s
 	toRemove := containers[:len(containers)-target]
 
 	for _, c := range toRemove {
-		log.Printf("[manager] Removing %s container: %s (RAM=%dKB VSZ=%dKB RSS=%dKB CPU=%.2f%%)",
+		log.Printf("[manager] Eliminando contenedor %s: %s (RAM=%dKB VSZ=%dKB RSS=%dKB CPU=%.2f%%)",
 			label, c.Name, c.RAM, c.VSZ, c.RSS, c.CPU)
 
 		if err := stopAndRemove(c.ID); err != nil {
-			log.Printf("[manager] Warning: failed to remove %s: %v", c.Name, err)
+			log.Printf("[manager] Advertencia: no se pudo eliminar %s: %v", c.Name, err)
 			continue
 		}
 
@@ -190,9 +190,9 @@ func RemoveAllCronJobContainers() error {
 			continue
 		}
 
-		log.Printf("[manager] Removing cronjob container on shutdown: %s", name)
+		log.Printf("[manager] Eliminando contenedor del cronjob al apagar: %s", name)
 		if err := stopAndRemove(container.ID); err != nil {
-			log.Printf("[manager] Warning: failed to remove %s during shutdown: %v", name, err)
+			log.Printf("[manager] Advertencia: no se pudo eliminar %s durante el apagado: %v", name, err)
 		}
 	}
 

@@ -32,7 +32,7 @@ func StartCronJob() error {
 
 	// Ejecutar script inmediatamente
 	if err := runCronScript(); err != nil {
-		log.Printf("[cron] Warning: error en ejecución inicial: %v", err)
+		log.Printf("[cron] Advertencia: error en ejecución inicial: %v", err)
 	}
 
 	// Iniciar gorrutina que ejecuta el script cada 2 minutos
@@ -82,7 +82,7 @@ func runCronScript() error {
 
 	log.Printf("[cron] Script ejecutado exitosamente")
 	if len(out) > 0 {
-		log.Printf("[cron] Output: %s", strings.TrimSpace(string(out)))
+		log.Printf("[cron] Salida: %s", strings.TrimSpace(string(out)))
 	}
 
 	return nil

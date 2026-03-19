@@ -123,14 +123,14 @@ func (c *Client) SaveContainerStats(containers []parser.ContainerInfo, memory pa
 	if deletionStats != nil && deletionStats.TotalCount > 0 {
 		deletionData, err := json.Marshal(deletionStats)
 		if err != nil {
-			log.Printf("[db] Warning: error al serializar estadísticas de eliminaciones: %w", err)
+			log.Printf("[db] Advertencia: error al serializar estadísticas de eliminaciones: %v", err)
 		} else {
 			if err := c.rdb.LPush(c.ctx, DELETIONS_HISTORY_KEY, deletionData).Err(); err != nil {
-				log.Printf("[db] Warning: error al guardar historial de eliminaciones: %w", err)
+				log.Printf("[db] Advertencia: error al guardar historial de eliminaciones: %v", err)
 			}
 
 			if err := c.rdb.LTrim(c.ctx, DELETIONS_HISTORY_KEY, 0, MAX_HISTORY-1).Err(); err != nil {
-				log.Printf("[db] Warning: error al limitar historial de eliminaciones: %w", err)
+				log.Printf("[db] Advertencia: error al limitar historial de eliminaciones: %v", err)
 			}
 		}
 	}

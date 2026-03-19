@@ -73,7 +73,7 @@ func runIteration(valkeyClient *db.Client) error {
 
 	memoryInfo, err := parser.ReadSystemMemoryInfo(PROC_FILE)
 	if err != nil {
-		log.Printf("[daemon] Warning: no se pudo leer memoria del sistema: %v", err)
+		log.Printf("[daemon] Advertencia: no se pudo leer memoria del sistema: %v", err)
 	}
 
 	// Leer la información de los contenedores desde el archivo proc
