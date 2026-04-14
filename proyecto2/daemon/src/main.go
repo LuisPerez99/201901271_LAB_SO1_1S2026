@@ -28,9 +28,9 @@ func main() {
 		log.Fatalf("[daemon] Error al iniciar servicios: %v", err)
 	}
 
-	// Iniciar cronjob manual (cada 2 minutos)
+	// Instalar cronjob del sistema (cronie)
 	if err := cron.StartCronJob(); err != nil {
-		log.Fatalf("[daemon] Error al iniciar cronjob: %v", err)
+		log.Fatalf("[daemon] Error al instalar cronjob: %v", err)
 	}
 
 	// Cargar modulo del kernel para obtener información de los containers
@@ -69,6 +69,15 @@ func main() {
 }
 
 func runIteration(valkeyClient *db.Client) error {
+	cronLogLines, err := cron.ReadNewExecutionLogs()
+	if err != nil {
+		log.Printf("[daemon] Advertencia: no se pudieron leer logs del cronjob: %v", err)
+	} else {
+		for _, line := range cronLogLines {
+			log.Printf("[cronjob] %s", line)
+		}
+	}
+
 	log.Println("[daemon] Leyendo archivo proc...")
 
 	memoryInfo, err := parser.ReadSystemMemoryInfo(PROC_FILE)

@@ -12,7 +12,7 @@ NOMBRE="p2-cronjob"
 LOG_FILE="/var/log/cronjob.log"
 
 log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE"
+    echo "$1" >> "$LOG_FILE"
 }
 
 random_container() {

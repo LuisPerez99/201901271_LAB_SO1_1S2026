@@ -1,0 +1,43 @@
+# Ignore
+target/
+Cargo.lock
+*.swp
+*.swo
+.env
+.env.local
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+env/
+venv/
+.DS_Store
+*.log
+.idea/
+.vscode/
+*.iml
+dist/
+build/
+*.egg-info/
+
+# Go
+vendor/
+*.out
+.go-version
+
+# Kubernetes
+kubeconfig
+*.kubeconfig
+
+# Zot registry
+zot-data/
+
+# Docker
+*.tar
+docker-compose.override.yml
+
+# Misc
+results/
+*.html
+metrics.csv

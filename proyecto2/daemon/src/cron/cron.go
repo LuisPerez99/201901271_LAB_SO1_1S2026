@@ -1,89 +1,128 @@
 package cron
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"log"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
-	"time"
+	"sync"
 )
 
 const (
 	CRON_SCRIPT   = "/home/pdrpm/SOPES1/LAB_SO1_1S2026/proyecto2/cronjob/crear-containers.sh"
-	CRON_INTERVAL = 2 * time.Minute
+	CRON_LOG_FILE = "/var/log/cronjob.log"
+	CRON_D_DIR    = "/etc/cron.d"
+	CRON_JOB_NAME = "pr2-proyecto2-cronjob"
+	CRON_SCHEDULE = "*/2 * * * *" // Cada 2 minutos
 )
 
 var (
-	stopChan chan struct{}
-	running  = false
+	logOffsetMu sync.Mutex
+	logOffset   int64 = -1
 )
 
-// StartCronJob inicia la ejecución manual del cronjob cada 2 minutos en background
+// StartCronJob instala el cronjob en el demonio cron del sistema (cronie)
 func StartCronJob() error {
-	if running {
-		log.Printf("[cron] Cronjob ya está ejecutándose")
+	log.Printf("[cron] Instalando cronjob del sistema cada 2 minutos...")
+
+	// Crear contenido del archivo cron
+	cronJobPath := filepath.Join(CRON_D_DIR, CRON_JOB_NAME)
+	cronContent := fmt.Sprintf("# Proyecto 2 - Cronjob para crear contenedores\n# DO NOT EDIT - Generado por daemon\n%s root bash %s\n",
+		CRON_SCHEDULE, CRON_SCRIPT)
+
+	// Verificar si el archivo ya existe
+	if _, err := os.Stat(cronJobPath); err == nil {
+		log.Printf("[cron] Cronjob ya está instalado en %s", cronJobPath)
 		return nil
 	}
 
-	log.Printf("[cron] Iniciando cronjob (cada %v)...", CRON_INTERVAL)
-
-	stopChan = make(chan struct{})
-	running = true
-
-	// Ejecutar script inmediatamente
-	if err := runCronScript(); err != nil {
-		log.Printf("[cron] Advertencia: error en ejecución inicial: %v", err)
+	// Crear el archivo de cronjob (requiere sudo)
+	cmd := exec.Command("sudo", "-n", "tee", cronJobPath)
+	cmd.Stdin = strings.NewReader(cronContent)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("error al instalar cronjob (requiere sudo NOPASSWD): %v, salida: %s", err, string(output))
 	}
 
-	// Iniciar gorrutina que ejecuta el script cada 2 minutos
-	go func() {
-		ticker := time.NewTicker(CRON_INTERVAL)
-		defer ticker.Stop()
+	// Establecer permisos del archivo
+	cmd = exec.Command("sudo", "-n", "chmod", "644", cronJobPath)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("error al establecer permisos del cronjob: %v, salida: %s", err, string(output))
+	}
 
-		for {
-			select {
-			case <-ticker.C:
-				if err := runCronScript(); err != nil {
-					log.Printf("[cron] Error ejecutando cronjob: %v", err)
-				}
-			case <-stopChan:
-				log.Printf("[cron] Cronjob detenido")
-				return
-			}
-		}
-	}()
-
+	log.Printf("[cron] Cronjob instalado exitosamente en %s", cronJobPath)
 	return nil
 }
 
-// StopCronJob detiene la ejecución del cronjob
+// StopCronJob desinstala el cronjob del demonio cron del sistema
 func StopCronJob() error {
-	if !running {
-		log.Printf("[cron] Cronjob no está ejecutándose")
+	log.Printf("[cron] Desinstalando cronjob del sistema...")
+
+	cronJobPath := filepath.Join(CRON_D_DIR, CRON_JOB_NAME)
+
+	// Verificar si el archivo existe
+	if _, err := os.Stat(cronJobPath); err != nil {
+		log.Printf("[cron] Cronjob no encontrado en %s", cronJobPath)
 		return nil
 	}
 
-	log.Printf("[cron] Deteniendo cronjob...")
-	running = false
-	close(stopChan)
+	// Eliminar el archivo de cronjob (requiere sudo)
+	cmd := exec.Command("sudo", "-n", "rm", "-f", cronJobPath)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("error al desinstalar cronjob: %v, salida: %s", err, string(output))
+	}
 
+	log.Printf("[cron] Cronjob desinstalado exitosamente")
 	return nil
 }
 
-// runCronScript ejecuta el script de creación de contenedores
-func runCronScript() error {
-	log.Printf("[cron] Ejecutando script: %s", CRON_SCRIPT)
+// ReadNewExecutionLogs devuelve las nuevas lineas del log del cronjob desde la
+// ultima lectura. Si el archivo se trunca, reinicia automaticamente el offset.
+func ReadNewExecutionLogs() ([]string, error) {
+	logOffsetMu.Lock()
+	defer logOffsetMu.Unlock()
 
-	cmd := exec.Command("bash", CRON_SCRIPT)
-	out, err := cmd.CombinedOutput()
+	file, err := os.Open(CRON_LOG_FILE)
 	if err != nil {
-		return fmt.Errorf("error al ejecutar cronjob script: %w\noutput: %s", err, string(out))
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("error al abrir log del cronjob: %w", err)
+	}
+	defer file.Close()
+
+	info, err := file.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("error al obtener metadata del log del cronjob: %w", err)
 	}
 
-	log.Printf("[cron] Script ejecutado exitosamente")
-	if len(out) > 0 {
-		log.Printf("[cron] Salida: %s", strings.TrimSpace(string(out)))
+	if logOffset < 0 || logOffset > info.Size() {
+		logOffset = info.Size()
+		return nil, nil
 	}
 
-	return nil
+	if _, err := file.Seek(logOffset, io.SeekStart); err != nil {
+		return nil, fmt.Errorf("error al posicionar lectura del log del cronjob: %w", err)
+	}
+
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error al leer log del cronjob: %w", err)
+	}
+
+	newOffset, err := file.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return nil, fmt.Errorf("error al actualizar offset del log del cronjob: %w", err)
+	}
+	logOffset = newOffset
+
+	return lines, nil
 }
