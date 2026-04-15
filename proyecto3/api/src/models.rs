@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 
 /// Estructura para recibir reportes JSON de Locust
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,7 +41,6 @@ pub struct HealthResponse {
 /// Enum para países válidos
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Country {
-    Unknown = 0,
     USA = 1,
     RUS = 2,
     CHN = 3,
@@ -59,10 +58,6 @@ impl Country {
             "GTM" => Some(Country::GTM),
             _ => None,
         }
-    }
-
-    pub fn to_i32(self) -> i32 {
-        self as i32
     }
 }
 

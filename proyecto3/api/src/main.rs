@@ -1,6 +1,4 @@
-use actix_web::{web, App, HttpServer, HttpResponse, middleware};
-use serde::{Deserialize, Serialize};
-use chrono::Utc;
+use actix_web::{middleware, web, App, HttpServer};
 use log::info;
 use std::sync::Arc;
 
@@ -8,7 +6,6 @@ mod models;
 mod handlers;
 mod config;
 
-use models::{WarReport, HealthResponse};
 use handlers::{health_check, receive_report};
 use config::AppState;
 
@@ -28,6 +25,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(middleware::Logger::default())
             .route("/health", web::get().to(health_check))
             .route("/report", web::post().to(receive_report))
+                .route("/grpc-1", web::post().to(receive_report))
     })
     .bind("0.0.0.0:3000")?
     .run()

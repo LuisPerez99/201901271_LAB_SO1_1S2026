@@ -1,6 +1,6 @@
 use actix_web::{web, HttpResponse, Result as ActixResult};
 use chrono::Utc;
-use log::{info, error};
+use log::{error, info};
 use std::sync::Arc;
 
 use crate::models::{WarReport, validate_report, HealthResponse, ReportResponse};
@@ -41,10 +41,50 @@ pub async fn receive_report(
                 timestamp: Utc::now().to_rfc3339(),
             };
 
-            // TODO: Forward to Go Service 1 via gRPC or HTTP
-            // For now, just log and return
+            let forward_result = app_state
+                .http_client
+                .post(&app_state.go_api_client_url)
+                .json(&*report)
+                .send()
+                .await;
 
-            Ok(HttpResponse::Accepted().json(response))
+            match forward_result {
+                Ok(resp) if resp.status().is_success() => {
+                    info!(
+                        "Forwarded report {} to go-api-client successfully",
+                        validated.report_id
+                    );
+                    Ok(HttpResponse::Accepted().json(response))
+                }
+                Ok(resp) => {
+                    error!(
+                        "go-api-client rejected report {} with status {}",
+                        validated.report_id,
+                        resp.status()
+                    );
+                    Ok(HttpResponse::BadGateway().json(serde_json::json!({
+                        "status": "error",
+                        "message": "Failed to forward report to go-api-client",
+                        "upstream_status": resp.status().as_u16(),
+                        "report_id": validated.report_id,
+                        "timestamp": Utc::now().to_rfc3339(),
+                    })))
+                }
+                Err(err) => {
+                    error!(
+                        "Forward error for report {}: {}",
+                        validated.report_id,
+                        err
+                    );
+                    Ok(HttpResponse::BadGateway().json(serde_json::json!({
+                        "status": "error",
+                        "message": "go-api-client unavailable",
+                        "details": err.to_string(),
+                        "report_id": validated.report_id,
+                        "timestamp": Utc::now().to_rfc3339(),
+                    })))
+                }
+            }
         }
         Err(e) => {
             error!("Validation error: {}", e);
