@@ -20,12 +20,12 @@ var (
 	rabbitmqUser  = os.Getenv("RABBITMQ_USER")
 	rabbitmqPass  = os.Getenv("RABBITMQ_PASS")
 	rabbitmqVhost = os.Getenv("RABBITMQ_VHOST")
-	
+
 	valkeyAddr = os.Getenv("VALKEY_ADDR")
 	valkeyPass = os.Getenv("VALKEY_PASS")
-	
+
 	consumerCountry = os.Getenv("CONSUMER_COUNTRY")
-	
+
 	// Metrics
 	mu                sync.Mutex
 	messagesProcessed int64
