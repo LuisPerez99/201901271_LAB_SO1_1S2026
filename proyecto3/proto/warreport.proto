@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package wartweets;
+option go_package = "proyecto3/go-shared-pb/pb;pb";
+option csharp_namespace = "Wartweets";
+
+// Mensaje que se enviará vía gRPC
+message WarReportRequest {
+  Countries country = 1;
+  int32 warplanes_in_air = 2;
+  int32 warships_in_water = 3;
+  string timestamp = 4;
+}
+
+// Lista de los únicos posibles países aceptados por el proyecto
+enum Countries {
+  countries_unknown = 0;
+  usa = 1;
+  rus = 2;
+  chn = 3;
+  esp = 4;
+  gtm = 5;
+}
+
+// Respuesta del servidor gRPC
+message WarReportResponse {
+  string status = 1;
+  string message = 2;
+  string report_id = 3;
+}
+
+// Servicio gRPC principal
+service WarReportService {
+  rpc SendReport (WarReportRequest) returns (WarReportResponse);
+}

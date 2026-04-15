@@ -41,3 +41,8 @@ docker-compose.override.yml
 results/
 *.html
 metrics.csv
+
+api-client
+consumer
+grpc-server
+

@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: go-consumer
+  namespace: proyecto3
+  labels:
+    app: go-consumer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: go-consumer
+  template:
+    metadata:
+      labels:
+        app: go-consumer
+    spec:
+      containers:
+      - name: consumer
+        image: zot:5000/go-consumer:v1
+        imagePullPolicy: Always
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        env:
+        - name: RABBITMQ_ADDR
+          value: "rabbitmq:5672"
+        - name: RABBITMQ_USER
+          value: "guest"
+        - name: RABBITMQ_PASS
+          value: "guest"
+        - name: RABBITMQ_VHOST
+          value: "/warreports"
+        - name: VALKEY_ADDR
+          value: "valkey-svc:6379"
+        - name: VALKEY_PASS
+          value: ""
+        - name: CONSUMER_COUNTRY
+          value: "usa"
