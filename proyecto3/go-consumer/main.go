@@ -76,7 +76,7 @@ func main() {
 	}
 	defer conn.Close()
 
-	ch, err := conn.NewChannel()
+	ch, err := conn.Channel()
 	if err != nil {
 		log.Fatalf("[CONSUMER] Failed to open channel: %v", err)
 	}

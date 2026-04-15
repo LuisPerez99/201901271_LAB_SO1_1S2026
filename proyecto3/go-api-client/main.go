@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -9,6 +11,11 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	pb "proyecto3/go-shared-pb/pb"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // WarReport estructura para recibir reportes JSON
@@ -32,6 +39,7 @@ var (
 	httpPort       = os.Getenv("HTTP_PORT")
 	mu             sync.Mutex
 	requestCount   int64
+	grpcClient     pb.WarReportServiceClient
 )
 
 func init() {
@@ -40,6 +48,23 @@ func init() {
 	}
 	if httpPort == "" {
 		httpPort = ":8080"
+	}
+}
+
+func mapCountry(country string) (pb.Countries, error) {
+	switch country {
+	case "USA":
+		return pb.Countries_usa, nil
+	case "RUS":
+		return pb.Countries_rus, nil
+	case "CHN":
+		return pb.Countries_chn, nil
+	case "ESP":
+		return pb.Countries_esp, nil
+	case "GTM":
+		return pb.Countries_gtm, nil
+	default:
+		return pb.Countries_countries_unknown, fmt.Errorf("invalid country %q", country)
 	}
 }
 
@@ -59,8 +84,26 @@ func handleReport(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[API-CLIENT] Received report: country=%s, planes=%d, ships=%d",
 		report.Country, report.WarplanesInAir, report.WarshipsInWater)
 
-	// TODO: Forward to gRPC server
-	// TODO: Log metrics
+	countryEnum, err := mapCountry(report.Country)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	grpcResp, err := grpcClient.SendReport(ctx, &pb.WarReportRequest{
+		Country:         countryEnum,
+		WarplanesInAir:  report.WarplanesInAir,
+		WarshipsInWater: report.WarshipsInWater,
+		Timestamp:       report.Timestamp,
+	})
+	if err != nil {
+		log.Printf("[API-CLIENT] gRPC forward failed: %v", err)
+		http.Error(w, "failed to forward report", http.StatusBadGateway)
+		return
+	}
 
 	mu.Lock()
 	requestCount++
@@ -70,7 +113,8 @@ func handleReport(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":    "accepted",
-		"message":   "Report forwarded to gRPC server",
+		"message":   grpcResp.GetMessage(),
+		"report_id": grpcResp.GetReportId(),
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
 	})
 }
@@ -101,6 +145,13 @@ func main() {
 	log.Println("[GO-API-CLIENT] Starting service...")
 	log.Printf("[GO-API-CLIENT] gRPC server: %s", grpcServerAddr)
 	log.Printf("[GO-API-CLIENT] Listening on %s", httpPort)
+
+	conn, err := grpc.Dial(grpcServerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("[GO-API-CLIENT] Failed to connect gRPC server: %v", err)
+	}
+	defer conn.Close()
+	grpcClient = pb.NewWarReportServiceClient(conn)
 
 	// Setup HTTP routes
 	http.HandleFunc("/report", handleReport)
