@@ -25,7 +25,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(middleware::Logger::default())
             .route("/health", web::get().to(health_check))
             .route("/report", web::post().to(receive_report))
-                .route("/grpc-1", web::post().to(receive_report))
+            .route("/grpc-201901271", web::post().to(receive_report))
     })
     .bind("0.0.0.0:3000")?
     .run()

@@ -1,7 +1,13 @@
 # Rust API Multi-stage Dockerfile
-FROM rust:1.75 as builder
+FROM rust:1.95 AS builder
 
 WORKDIR /app
+
+# Install build dependencies for OpenSSL and other native libraries
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY Cargo.toml Cargo.lock* ./
 COPY src ./src
