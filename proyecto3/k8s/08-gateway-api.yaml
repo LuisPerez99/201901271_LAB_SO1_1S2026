@@ -43,7 +43,7 @@ spec:
   - matches:
     - path:
         type: PathPrefix
-        value: /grpc-1
+        value: /grpc-201901271
     backendRefs:
     - name: rust-api
       port: 3000
