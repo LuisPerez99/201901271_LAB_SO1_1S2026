@@ -46,6 +46,20 @@ spec:
             port: 8080
           initialDelaySeconds: 5
           periodSeconds: 5
+      - name: api-client-sidecar
+        image: zot:5000/go-api-client:v1
+        imagePullPolicy: Always
+        command:
+        - sh
+        - -c
+        - trap : TERM INT; sleep infinity & wait
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            cpu: 50m
+            memory: 32Mi
 
 ---
 apiVersion: v1
