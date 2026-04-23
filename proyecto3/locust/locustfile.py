@@ -33,7 +33,7 @@ class WarReportTasks(TaskSet):
         }
 
         with self.client.post(
-            "/grpc-1",  # Gateway API route
+            "/grpc-201901271",  # Gateway API route
             json=report,
             catch_response=True,
             timeout=10
@@ -62,7 +62,7 @@ class MilitaryMonitoringUser(HttpUser):
 def on_test_start(environment, **kwargs):
     logger.info("=" * 60)
     logger.info("M.U.M.N.K8s Load Test Started")
-    logger.info("Target: /grpc-1 endpoint")
+    logger.info("Target: /grpc-201901271 endpoint")
     logger.info("=" * 60)
 
 
