@@ -1,16 +1,19 @@
+# syntax=docker/dockerfile:1.4
 # Go API Client Multi-stage Dockerfile
 FROM golang:1.21-alpine AS builder
 
-WORKDIR /app
-
-# Copy the shared protobuf module first so the local replace works during build.
-COPY go-shared-pb ./go-shared-pb
-COPY go-api-client/go.mod go-api-client/go.sum* ./go-api-client/
+RUN apk --no-cache add ca-certificates
 
 WORKDIR /app/go-api-client
+
+# Copy shared protobuf module from an extra build context named "sharedpb".
+# This keeps replace ../go-shared-pb working without cloning from GitHub.
+COPY --from=sharedpb . /app/go-shared-pb
+
+COPY go.mod go.sum* ./
 RUN go mod download
 
-COPY go-api-client/. .
+COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o api-client .
 
