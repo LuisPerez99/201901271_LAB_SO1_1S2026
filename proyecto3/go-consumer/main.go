@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -158,7 +159,7 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		reportJSON, _ := json.Marshal(report)
 
-		err := rdb.Set(ctx, key, string(reportJSON), 7*24*time.Hour).Err()
+		err = storeDashboardData(ctx, rdb, key, report, reportJSON)
 		cancel()
 
 		if err != nil {
@@ -177,4 +178,51 @@ func main() {
 		log.Printf("[CONSUMER] Stored report: key=%s", key)
 		d.Ack(false) // acknowledge
 	}
+}
+
+func storeDashboardData(ctx context.Context, rdb *redis.Client, key string, report Report, reportJSON []byte) error {
+	parsedTimestamp, err := time.Parse(time.RFC3339Nano, report.Timestamp)
+	if err != nil {
+		parsedTimestamp = time.Now().UTC()
+	}
+
+	countryKey := fmt.Sprintf("dashboard:country:%s", report.Country)
+	globalPlanesValuesKey := "dashboard:global:planes:values"
+	globalShipsValuesKey := "dashboard:global:ships:values"
+	globalPlanesFreqKey := "dashboard:global:planes:freq"
+	globalShipsFreqKey := "dashboard:global:ships:freq"
+	timelineKey := fmt.Sprintf("%s:timeline", countryKey)
+
+	pipe := rdb.TxPipeline()
+	pipe.Set(ctx, key, string(reportJSON), 7*24*time.Hour)
+	pipe.Set(ctx, fmt.Sprintf("%s:raw:%s", countryKey, parsedTimestamp.Format(time.RFC3339Nano)), string(reportJSON), 7*24*time.Hour)
+	pipe.Incr(ctx, fmt.Sprintf("%s:reports_total", countryKey))
+	pipe.Incr(ctx, "dashboard:global:reports_total")
+	pipe.HIncrBy(ctx, fmt.Sprintf("%s:planes:sum", countryKey), "total", int64(report.WarplanesInAir))
+	pipe.HIncrBy(ctx, fmt.Sprintf("%s:ships:sum", countryKey), "total", int64(report.WarshipsInWater))
+	pipe.HIncrBy(ctx, globalPlanesFreqKey, strconv.FormatInt(int64(report.WarplanesInAir), 10), 1)
+	pipe.HIncrBy(ctx, globalShipsFreqKey, strconv.FormatInt(int64(report.WarshipsInWater), 10), 1)
+	pipe.HIncrBy(ctx, fmt.Sprintf("%s:planes:freq", countryKey), strconv.FormatInt(int64(report.WarplanesInAir), 10), 1)
+	pipe.HIncrBy(ctx, fmt.Sprintf("%s:ships:freq", countryKey), strconv.FormatInt(int64(report.WarshipsInWater), 10), 1)
+	pipe.ZAdd(ctx, globalPlanesValuesKey, redis.Z{
+		Score:  float64(report.WarplanesInAir),
+		Member: fmt.Sprintf("%s:%s:planes:%d", parsedTimestamp.Format(time.RFC3339Nano), report.Country, report.WarplanesInAir),
+	})
+	pipe.ZAdd(ctx, globalShipsValuesKey, redis.Z{
+		Score:  float64(report.WarshipsInWater),
+		Member: fmt.Sprintf("%s:%s:ships:%d", parsedTimestamp.Format(time.RFC3339Nano), report.Country, report.WarshipsInWater),
+	})
+	pipe.ZAdd(ctx, timelineKey, redis.Z{
+		Score: float64(parsedTimestamp.UnixNano()),
+		Member: fmt.Sprintf(
+			"country=%s|planes=%d|ships=%d|ts=%s",
+			report.Country,
+			report.WarplanesInAir,
+			report.WarshipsInWater,
+			parsedTimestamp.Format(time.RFC3339Nano),
+		),
+	})
+
+	_, err = pipe.Exec(ctx)
+	return err
 }

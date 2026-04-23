@@ -1,5 +1,5 @@
 # Go Consumer Multi-stage Dockerfile
-FROM golang:1.21-alpine as builder
+FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
 
