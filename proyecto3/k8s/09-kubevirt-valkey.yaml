@@ -1,0 +1,78 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: valkey-svc
+  namespace: proyecto3
+  labels:
+    app: valkey-vm
+spec:
+  type: ClusterIP
+  selector:
+    app: valkey-vm
+  ports:
+  - name: valkey
+    port: 6379
+    targetPort: 6379
+    protocol: TCP
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: valkey-vm
+  namespace: proyecto3
+  labels:
+    app: valkey-vm
+spec:
+  runStrategy: Always
+  template:
+    metadata:
+      labels:
+        app: valkey-vm
+        kubevirt.io/domain: valkey-vm
+    spec:
+      domain:
+        cpu:
+          cores: 2
+        resources:
+          requests:
+            memory: 1Gi
+        devices:
+          disks:
+          - name: rootdisk
+            disk:
+              bus: virtio
+          - name: cloudinitdisk
+            disk:
+              bus: virtio
+          interfaces:
+          - name: default
+            masquerade: {}
+            ports:
+            - name: valkey
+              port: 6379
+      networks:
+      - name: default
+        pod: {}
+      volumes:
+      - name: rootdisk
+        containerDisk:
+          image: quay.io/containerdisks/ubuntu:24.04
+      - name: cloudinitdisk
+        cloudInitNoCloud:
+          userData: |
+            #cloud-config
+            package_update: true
+            package_upgrade: true
+            packages:
+              - valkey-server
+            write_files:
+              - path: /etc/systemd/system/valkey-server.service.d/override.conf
+                permissions: '0644'
+                content: |
+                  [Service]
+                  ExecStart=
+                  ExecStart=/usr/bin/valkey-server /etc/valkey/valkey.conf --daemonize no --protected-mode no --bind 0.0.0.0
+            runcmd:
+              - systemctl daemon-reload
+              - systemctl enable valkey-server
+              - systemctl restart valkey-server
