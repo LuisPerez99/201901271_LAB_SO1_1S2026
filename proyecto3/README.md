@@ -31,27 +31,31 @@ proyecto3/
 ├── proto/                 # gRPC Protocol Buffer definitions
 │   └── warreport.proto
 ├── k8s/                   # Kubernetes manifests
-│   ├── namespace.yaml
-│   ├── rus-api.yaml
-│   ├── go-api-client.yaml
-│   ├── go-grpc-server.yaml
-│   ├── rabbitmq.yaml
-│   ├── consumer.yaml
-│   ├── gateway-api.yaml
-│   └── hpa.yaml
+│   ├── 01-namespace.yaml
+│   ├── 02-rust-api.yaml
+│   ├── 03-rabbitmq.yaml
+│   ├── 04-go-api-client.yaml
+│   ├── 05-go-grpc-server.yaml
+│   ├── 06-go-consumer.yaml
+│   ├── 07-hpa.yaml
+│   ├── 08-gateway-api.yaml
+│   ├── 09-kubevirt-valkey.yaml
+│   └── 10-kubevirt-grafana.yaml
 ├── locust/                # Load generation scripts
 │   ├── locustfile.py
 │   └── requirements.txt
 ├── docs/                  # Documentation
-│   └── MANUAL_TECNICO.md
+│   ├── MANUAL_TECNICO.md
+│   ├── ZOT_REGISTRY_SETUP.md  # Zot HTTPS registry setup guide
+│   └── DEPLOYMENT_VERIFICATION.md  # Post-deployment validation
 └── README.md (this file)
 ```
 
 ## Componentes
 
 1. **Rust API REST** - Entry point, recibe solicitudes de Locust
-2. **Go Service 1** - REST proxy + gRPC client
-3. **Go Service 2** - gRPC server + RabbitMQ publisher
+2. **Go Service 1** - REST proxy + gRPC client, desplegado con 2 contenedores
+3. **Go Service 2** - gRPC server + RabbitMQ publisher, desplegado con 2 contenedores
 4. **RabbitMQ** - Message broker
 5. **Go Consumer** - Consume mensajes → almacena en Valkey
 6. **Valkey** - Base de datos en memoria (en KubeVirt VM)
@@ -62,7 +66,7 @@ proyecto3/
 ```
 Locust (JSON)
     ↓
-[Gateway API] /grpc-1
+[Gateway API] /grpc-201901271
     ↓
 Rust API (REST) :3000
     ↓
@@ -80,6 +84,28 @@ Grafana (visualización)
 ```
 
 ## Inicio Rápido
+
+### 0. Setup Zot HTTPS Registry (REQUERIDO)
+
+Consultar: [docs/ZOT_REGISTRY_SETUP.md](docs/ZOT_REGISTRY_SETUP.md)
+
+```bash
+# En GCP VM:
+# 1. Instalar Zot con HTTPS
+# 2. Generar certificados autofirmados  
+# 3. Crear credentials: htpasswd admin:admin123
+# 4. Ejecutar como systemd service
+
+# Localmente:
+export ZOT_HOST="<IP_VM_GCP>"
+docker login -u admin -p admin123 ${ZOT_HOST}:5000
+
+# Construir y publicar todas las imágenes
+./scripts/build-and-push-images.sh ${ZOT_HOST}:5000
+
+# Verificar
+curl -k -u admin:admin123 https://${ZOT_HOST}:5000/v2/_catalog
+```
 
 ### 1. Deploy Rust API
 ```bash
@@ -140,8 +166,8 @@ curl -X POST http://localhost:3000/report \
 - [ ] Go Services implementation
 - [ ] RabbitMQ deployment
 - [ ] Consumer implementation
-- [ ] Valkey setup
-- [ ] Grafana setup
+- [x] Valkey setup
+- [x] Grafana setup
 - [ ] Load testing
 - [ ] Documentation
 
