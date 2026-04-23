@@ -1,14 +1,16 @@
+# syntax=docker/dockerfile:1.4
 # Go Consumer Multi-stage Dockerfile
 FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
 
 COPY go.mod go.sum* ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o consumer .
+RUN --mount=type=cache,target=/root/.cache/go-build \
+	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o consumer .
 
 FROM alpine:3.18
 
