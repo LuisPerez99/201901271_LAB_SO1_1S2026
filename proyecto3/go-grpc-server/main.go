@@ -164,8 +164,9 @@ func publishToRabbitMQ(country string, message []byte) error {
 		false,        // mandatory
 		false,        // immediate
 		amqp.Publishing{
-			ContentType: "application/json",
-			Body:        message,
+			ContentType:  "application/json",
+			DeliveryMode: amqp.Persistent,
+			Body:         message,
 		},
 	)
 }
