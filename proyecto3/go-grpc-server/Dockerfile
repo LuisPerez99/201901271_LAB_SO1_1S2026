@@ -1,18 +1,22 @@
+# syntax=docker/dockerfile:1.4
 # Go gRPC Server Multi-stage Dockerfile
 FROM golang:1.21-alpine AS builder
 
-WORKDIR /app
-
-# Copy the shared protobuf module first so the local replace works during build.
-COPY go-shared-pb ./go-shared-pb
-COPY go-grpc-server/go.mod go-grpc-server/go.sum* ./go-grpc-server/
+RUN apk --no-cache add ca-certificates
 
 WORKDIR /app/go-grpc-server
-RUN go mod download
 
-COPY go-grpc-server/. .
+# Copy shared protobuf module from an extra build context named "sharedpb".
+# This keeps replace ../go-shared-pb working without cloning from GitHub.
+COPY --from=sharedpb . /app/go-shared-pb
 
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o grpc-server .
+COPY go.mod go.sum* ./
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
+
+COPY . .
+
+RUN --mount=type=cache,target=/root/.cache/go-build \
+	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o grpc-server .
 
 FROM alpine:3.18
 
