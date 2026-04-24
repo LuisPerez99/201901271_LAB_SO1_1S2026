@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -44,7 +45,7 @@ func init() {
 		rabbitmqPass = "guest"
 	}
 	if rabbitmqVhost == "" {
-		rabbitmqVhost = "/warreports"
+		rabbitmqVhost = "warreports"
 	}
 	if valkeyAddr == "" {
 		valkeyAddr = "valkey-svc:6379"
@@ -70,7 +71,8 @@ func main() {
 	log.Printf("[CONSUMER] Valkey: %s", valkeyAddr)
 
 	// Connect to RabbitMQ
-	dsn := fmt.Sprintf("amqp://%s:%s@%s%s", rabbitmqUser, rabbitmqPass, rabbitmqAddr, rabbitmqVhost)
+	vhost := strings.TrimPrefix(rabbitmqVhost, "/")
+	dsn := fmt.Sprintf("amqp://%s:%s@%s/%s", rabbitmqUser, rabbitmqPass, rabbitmqAddr, vhost)
 	conn, err := amqp.Dial(dsn)
 	if err != nil {
 		log.Fatalf("[CONSUMER] Failed to connect to RabbitMQ: %v", err)

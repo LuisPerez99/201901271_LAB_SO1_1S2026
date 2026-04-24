@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -79,7 +80,7 @@ func init() {
 		rabbitmqAddr = "rabbitmq:5672"
 	}
 	if rabbitmqVhost == "" {
-		rabbitmqVhost = "/warreports"
+		rabbitmqVhost = "warreports"
 	}
 	if rabbitmqUser == "" {
 		rabbitmqUser = "guest"
@@ -91,7 +92,18 @@ func init() {
 
 // initRabbitMQ inicializa la conexión a RabbitMQ
 func initRabbitMQ() error {
-	dsn := fmt.Sprintf("amqp://%s:%s@%s%s", rabbitmqUser, rabbitmqPass, rabbitmqAddr, rabbitmqVhost)
+	// Close previous resources before creating a fresh connection.
+	if ch != nil {
+		_ = ch.Close()
+		ch = nil
+	}
+	if conn != nil {
+		_ = conn.Close()
+		conn = nil
+	}
+
+	vhost := strings.TrimPrefix(rabbitmqVhost, "/")
+	dsn := fmt.Sprintf("amqp://%s:%s@%s/%s", rabbitmqUser, rabbitmqPass, rabbitmqAddr, vhost)
 
 	var err error
 	conn, err = amqp.Dial(dsn)
@@ -151,18 +163,48 @@ func initRabbitMQ() error {
 	return nil
 }
 
+func ensureRabbitMQReady() error {
+	if conn != nil && !conn.IsClosed() && ch != nil {
+		return nil
+	}
+	return initRabbitMQ()
+}
+
 // publishToRabbitMQ publica un mensaje a RabbitMQ
 func publishToRabbitMQ(country string, message []byte) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	routingKey := fmt.Sprintf("reports.%s", country)
+	if err := ensureRabbitMQReady(); err != nil {
+		return err
+	}
 
-	return ch.Publish(
+	routingKey := fmt.Sprintf("reports.%s", country)
+	err := ch.Publish(
 		"warreports", // exchange
 		routingKey,   // routing key
 		false,        // mandatory
 		false,        // immediate
+		amqp.Publishing{
+			ContentType:  "application/json",
+			DeliveryMode: amqp.Persistent,
+			Body:         message,
+		},
+	)
+	if err == nil {
+		return nil
+	}
+
+	// Retry once after reconnecting in case RabbitMQ restarted and invalidated the channel.
+	if reinitErr := initRabbitMQ(); reinitErr != nil {
+		return fmt.Errorf("publish failed: %v; reinit failed: %w", err, reinitErr)
+	}
+
+	return ch.Publish(
+		"warreports",
+		routingKey,
+		false,
+		false,
 		amqp.Publishing{
 			ContentType:  "application/json",
 			DeliveryMode: amqp.Persistent,
