@@ -26,8 +26,8 @@ spec:
     spec:
       containers:
       - name: api
-        image: zot:5000/api-rust:v1
-        imagePullPolicy: Always
+        image: api-rust:201901271
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3000
           name: http

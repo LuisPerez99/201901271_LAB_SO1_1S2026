@@ -15,10 +15,17 @@ spec:
       labels:
         app: go-consumer
     spec:
+      initContainers:
+      - name: wait-for-rabbitmq
+        image: busybox:1.36
+        command:
+        - sh
+        - -c
+        - until nc -z rabbitmq 5672; do echo waiting for rabbitmq; sleep 2; done
       containers:
       - name: consumer
-        image: zot:5000/go-consumer:v1
-        imagePullPolicy: Always
+        image: go-consumer:201901271
+        imagePullPolicy: IfNotPresent
         resources:
           requests:
             cpu: 100m
@@ -34,7 +41,7 @@ spec:
         - name: RABBITMQ_PASS
           value: "guest"
         - name: RABBITMQ_VHOST
-          value: "/warreports"
+          value: "warreports"
         - name: VALKEY_ADDR
           value: "valkey-svc:6379"
         - name: VALKEY_PASS

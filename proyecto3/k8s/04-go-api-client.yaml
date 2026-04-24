@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
       - name: api-client
-        image: zot:5000/go-api-client:v1
-        imagePullPolicy: Always
+        image: go-api-client:201901271
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
           name: http
@@ -47,12 +47,12 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 5
       - name: api-client-sidecar
-        image: zot:5000/go-api-client:v1
-        imagePullPolicy: Always
+        image: go-api-client:201901271
+        imagePullPolicy: IfNotPresent
         command:
         - sh
         - -c
-        - trap : TERM INT; sleep infinity & wait
+        - "trap : TERM INT; sleep infinity & wait"
         resources:
           requests:
             cpu: 10m
