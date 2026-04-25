@@ -4,96 +4,14 @@ metadata:
   name: grafana-svc
   namespace: proyecto3
   labels:
-    app: grafana-vm
+    app: grafana
 spec:
-  type: ClusterIP
+  type: NodePort
   selector:
-    app: grafana-vm
+    vm.kubevirt.io/name: alpine-vm
   ports:
-  - name: http
-    port: 3000
-    targetPort: 3000
-    protocol: TCP
----
-apiVersion: kubevirt.io/v1
-kind: VirtualMachine
-metadata:
-  name: grafana-vm
-  namespace: proyecto3
-  labels:
-    app: grafana-vm
-spec:
-  runStrategy: Always
-  template:
-    metadata:
-      labels:
-        app: grafana-vm
-        kubevirt.io/domain: grafana-vm
-    spec:
-      domain:
-        cpu:
-          cores: 2
-        resources:
-          requests:
-            memory: 2Gi
-        devices:
-          disks:
-          - name: rootdisk
-            disk:
-              bus: virtio
-          - name: cloudinitdisk
-            disk:
-              bus: virtio
-          interfaces:
-          - name: default
-            masquerade: {}
-            ports:
-            - name: http
-              port: 3000
-      networks:
-      - name: default
-        pod: {}
-      volumes:
-      - name: rootdisk
-        containerDisk:
-          image: quay.io/containerdisks/ubuntu:24.04
-      - name: cloudinitdisk
-        cloudInitNoCloud:
-          userData: |
-            #cloud-config
-            package_update: true
-            package_upgrade: true
-            packages:
-              - curl
-              - gnupg
-              - apt-transport-https
-            write_files:
-              - path: /usr/local/bin/install-grafana.sh
-                permissions: '0755'
-                content: |
-                  #!/bin/bash
-                  set -e
-                  install -d -m 0755 /etc/apt/keyrings
-                  curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor -o /etc/apt/keyrings/grafana.gpg
-                  echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" > /etc/apt/sources.list.d/grafana.list
-                  apt-get update
-                  apt-get install -y grafana
-                  grafana-cli plugins install redis-datasource
-                  install -d -m 0755 /etc/grafana/provisioning/datasources
-                  cat > /etc/grafana/provisioning/datasources/valkey.yaml <<'EOF'
-                  apiVersion: 1
-                  datasources:
-                    - name: Valkey
-                      uid: valkey
-                      type: redis-datasource
-                      access: proxy
-                      url: valkey-svc.proyecto3.svc.cluster.local:6379
-                      isDefault: true
-                      editable: false
-                  EOF
-                  sed -i 's/^;http_addr = 127.0.0.1/http_addr = 0.0.0.0/' /etc/grafana/grafana.ini || true
-                  systemctl daemon-reload
-                  systemctl enable grafana-server
-                  systemctl restart grafana-server
-            runcmd:
-              - /usr/local/bin/install-grafana.sh
+    - name: grafana
+      protocol: TCP
+      port: 3000
+      targetPort: 3000
+      nodePort: 32000
