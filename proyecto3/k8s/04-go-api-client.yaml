@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: api-client
-        image: go-api-client:201901271
+        image: 34.16.70.73:5000/go-api-client:201901271
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
@@ -47,7 +47,7 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 5
       - name: api-client-sidecar
-        image: go-api-client:201901271
+        image: 34.16.70.73:5000/go-api-client:201901271
         imagePullPolicy: IfNotPresent
         command:
         - sh

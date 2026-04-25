@@ -24,7 +24,7 @@ spec:
         - until nc -z rabbitmq 5672; do echo waiting for rabbitmq; sleep 2; done
       containers:
       - name: grpc-server
-        image: go-grpc-server:201901271
+        image: 34.16.70.73:5000/go-grpc-server:201901271
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 50051
@@ -48,7 +48,7 @@ spec:
         - name: RABBITMQ_VHOST
           value: "warreports"
       - name: grpc-server-sidecar
-        image: go-grpc-server:201901271
+        image: 34.16.70.73:5000/go-grpc-server:201901271
         imagePullPolicy: IfNotPresent
         command:
         - sh

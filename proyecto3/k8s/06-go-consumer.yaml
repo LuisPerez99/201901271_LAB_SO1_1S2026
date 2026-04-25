@@ -24,7 +24,7 @@ spec:
         - until nc -z rabbitmq 5672; do echo waiting for rabbitmq; sleep 2; done
       containers:
       - name: consumer
-        image: go-consumer:201901271
+        image: 34.16.70.73:5000/go-consumer:201901271
         imagePullPolicy: IfNotPresent
         resources:
           requests:

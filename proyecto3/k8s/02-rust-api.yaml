@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
       - name: api
-        image: api-rust:201901271
+        image: 34.16.70.73:5000/api-rust:201901271
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3000
