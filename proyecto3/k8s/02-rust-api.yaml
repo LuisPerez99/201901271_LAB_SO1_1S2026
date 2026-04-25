@@ -24,6 +24,8 @@ spec:
       labels:
         app: rust-api
     spec:
+      imagePullSecrets:
+      - name: zot-credentials
       containers:
       - name: api
         image: 34.16.70.73:5000/api-rust:201901271
