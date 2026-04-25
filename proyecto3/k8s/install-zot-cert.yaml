@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: install-zot-cert
+  namespace: proyecto3
+  labels:
+    name: install-zot-cert
+spec:
+  selector:
+    matchLabels:
+      name: install-zot-cert
+  template:
+    metadata:
+      labels:
+        name: install-zot-cert
+    spec:
+      hostPID: true
+      hostNetwork: true
+      initContainers:
+      - name: install-cert
+        image: alpine
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            cp /tmp/zot.crt /usr/local/share/ca-certificates/zot.crt
+            update-ca-certificates
+            # Reiniciar containerd para que use el nuevo certificado
+            nsenter --target 1 --mount -- /usr/bin/systemctl restart containerd
+        volumeMounts:
+        - name: zot-cert-vol
+          mountPath: /tmp/zot.crt
+          subPath: zot.crt
+        - name: node-certs
+          mountPath: /usr/local/share/ca-certificates
+        - name: host-systemctl
+          mountPath: /usr/bin/systemctl
+        securityContext:
+          privileged: true
+      containers:
+      - name: sleep
+        image: gcr.io/google-containers/pause:3.2
+      volumes:
+      - name: zot-cert-vol
+        secret:
+          secretName: zot-ca-cert
+      - name: node-certs
+        hostPath:
+          path: /usr/local/share/ca-certificates
+      - name: host-systemctl
+        hostPath:
+          path: /usr/bin/systemctl

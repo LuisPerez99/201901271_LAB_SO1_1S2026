@@ -193,18 +193,24 @@ cd /home/pdrpm/SOPES1/LAB_SO1_1S2026/proyecto3
 
 # Rust API
 cd api
-docker build -t ${ZOT_HOST}:5000/rust-api:201901271 .
-docker push ${ZOT_HOST}:5000/rust-api:201901271
+docker build -t ${ZOT_HOST}:5000/api-rust:201901271 .
+docker push ${ZOT_HOST}:5000/api-rust:201901271
 
 # Go API Client
 cd ../go-api-client
-docker build -t ${ZOT_HOST}:5000/api-client:201901271 .
-docker push ${ZOT_HOST}:5000/api-client:201901271
+docker build \
+  --build-context sharedpb=../go-shared-pb \
+  -t ${ZOT_HOST}:5000/go-api-client:201901271 \
+  .
+docker push ${ZOT_HOST}:5000/go-api-client:201901271
 
 # Go gRPC Server
 cd ../go-grpc-server
-docker build -t ${ZOT_HOST}:5000/grpc-server:201901271 .
-docker push ${ZOT_HOST}:5000/grpc-server:201901271
+cd go-grpc-server && docker build \
+  --build-context sharedpb=../go-shared-pb \
+  -t ${ZOT_HOST}:5000/go-grpc-server:201901271 \
+  .
+docker push ${ZOT_HOST}:5000/go-grpc-server:201901271
 
 # Go Consumer
 cd ../go-consumer
@@ -219,11 +225,11 @@ docker push ${ZOT_HOST}:5000/go-consumer:201901271
 curl -k -u admin:admin123 https://${ZOT_HOST}:5000/v2/_catalog
 
 # Listar tags de una imagen
-curl -k -u admin:admin123 https://${ZOT_HOST}:5000/v2/rust-api/tags/list
+curl -k -u admin:admin123 https://${ZOT_HOST}:5000/v2/api-rust/tags/list
 
 # Ejemplo de salida:
 # {
-#   "name": "rust-api",
+#   "name": "api-rust",
 #   "tags": ["201901271"]
 # }
 ```
@@ -343,7 +349,7 @@ kubectl create secret docker-registry zot-credentials \
 ### 4.2 Actualizar Manifests para Usar Zot
 
 ```yaml
-# Ejemplo en deployment (ej: k8s/02-rust-api.yaml)
+# Ejemplo en deployment (ej: k8s/02-api-rust.yaml)
 spec:
   template:
     spec:
@@ -351,7 +357,7 @@ spec:
       - name: zot-credentials
       containers:
       - name: rust-api
-        image: ${ZOT_HOST}:5000/rust-api:201901271
+        image: ${ZOT_HOST}:5000/api-rust:201901271
         imagePullPolicy: IfNotPresent
 ```
 
