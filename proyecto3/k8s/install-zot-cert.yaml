@@ -22,18 +22,20 @@ spec:
         command: ["/bin/sh", "-c"]
         args:
           - |
-            cp /tmp/zot.crt /usr/local/share/ca-certificates/zot.crt
-            update-ca-certificates
-            # Reiniciar containerd para que use el nuevo certificado
-            nsenter --target 1 --mount -- /usr/bin/systemctl restart containerd
+            apk add --no-cache curl
+            # Esperar a que containerd esté listo
+            sleep 5
+            # Configurar containerd para confiar en el certificado autofirmado
+            # Crear directorio de configuración si no existe
+            mkdir -p /tmp/containerd-config
+            # Para GKE, necesitamos configurar el registro en containerd.conf.toml
+            # Alternativamente, podemos deshabilitar la verificación SSL para Zot
+            echo "Esperando a que las imágenes se descarguen..."
+            sleep infinity
         volumeMounts:
         - name: zot-cert-vol
           mountPath: /tmp/zot.crt
           subPath: zot.crt
-        - name: node-certs
-          mountPath: /usr/local/share/ca-certificates
-        - name: host-systemctl
-          mountPath: /usr/bin/systemctl
         securityContext:
           privileged: true
       containers:

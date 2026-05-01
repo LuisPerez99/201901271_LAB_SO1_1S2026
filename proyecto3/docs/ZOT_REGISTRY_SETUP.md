@@ -51,15 +51,13 @@ gcloud compute instances describe zot-registry \
 sudo apt-get update && sudo apt-get install -y curl wget
 
 # Descargar Zot última versión
-ZOT_VERSION=$(curl -s https://api.github.com/repos/project-zot/zot/releases/latest | grep -Po '"tag_name": "\K[0-9.]+')
-wget https://github.com/project-zot/zot/releases/download/v${ZOT_VERSION}/zot-linux-amd64
+sudo wget -O /usr/local/bin/zot https://github.com/project-zot/zot/releases/download/v2.1.16/zot-linux-amd64
 
 # Hacer ejecutable
-chmod +x zot-linux-amd64
-sudo mv zot-linux-amd64 /usr/local/bin/zot
+sudo chmod +x /usr/local/bin/zot
 
 # Verificar instalación
-zot version
+zot --version
 ```
 
 ### 1.3 Generar Certificados HTTPS Autofirmados
@@ -77,48 +75,41 @@ openssl req -x509 -newkey rsa:4096 -keyout /var/lib/zot/certs/key.pem \
 openssl x509 -in /var/lib/zot/certs/cert.pem -text -noout | grep "Subject:\|Not Before\|Not After"
 ```
 
-### 1.4 Crear Configuración de Zot
+### 1.4 Crear Configuración de Zot (v2.1.16)
 
-```yaml
-# /etc/zot/config.json
+The configuration schema changed across Zot releases. Use the binary to validate your config after editing:
+
+```bash
+# Test config (runs Zot in foreground and prints schema errors)
+sudo /usr/local/bin/zot serve /etc/zot/config.json
+```
+
+If you want a minimal, working HTTPS-enabled config for `v2.1.16` (no access-control policies), use the following example. Back up any existing `/etc/zot/config.json` first.
+
+```json
 {
-  "server": {
-    "protocol": "https",
-    "host": "0.0.0.0",
-    "port": "5000",
-    "certificate": "/var/lib/zot/certs/cert.pem",
-    "key": "/var/lib/zot/certs/key.pem"
-  },
   "storage": {
     "rootDirectory": "/var/lib/zot/storage"
+  },
+  "http": {
+    "addr": "0.0.0.0:5000",
+    "tls": {
+      "cert": "/var/lib/zot/certs/cert.pem",
+      "key": "/var/lib/zot/certs/key.pem"
+    }
   },
   "auth": {
     "htpasswd": {
       "path": "/var/lib/zot/auth.htpasswd"
     }
-  },
-  "accessControl": {
-    "repositories": {
-      "**": {
-        "policies": [
-          {
-            "users": ["admin"],
-            "actions": ["read", "create", "update", "delete"]
-          },
-          {
-            "anonymous": ["read"]
-          }
-        ]
-      }
-    }
-  },
-  "http": {
-    "accessLog": {
-      "level": "info"
-    }
   }
 }
 ```
+
+Notes:
+- This minimal config starts Zot with HTTPS, basic htpasswd auth, and local filesystem storage.
+- If you need advanced `access control` or `access log` configuration, copy the sample config from the Zot v2.1.16 release or the project documentation and adapt it. The schema names and casing must match the Zot binary; mismatches cause the service to fail with unmarshalling errors.
+- After editing, validate with `sudo /usr/local/bin/zot serve /etc/zot/config.json` and check `sudo journalctl -u zot -f` for runtime errors.
 
 ### 1.5 Crear Archivo de Autenticación
 
