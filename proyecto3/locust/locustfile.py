@@ -56,7 +56,7 @@ class MilitaryMonitoringUser(HttpUser):
     
     tasks = [WarReportTasks]
     wait_time = between(0.5, 2)  # Espera entre 0.5 y 2 segundos
-
+    host = "http://35.208.205.185"
 
 @events.test_start.add_listener
 def on_test_start(environment, **kwargs):
