@@ -16,7 +16,7 @@ spec:
         app: go-grpc-server
     spec:
       imagePullSecrets:
-      - name: zot-credentials
+      - name: zot-regcred
       initContainers:
       - name: wait-for-rabbitmq
         image: busybox:1.36
@@ -26,7 +26,7 @@ spec:
         - until nc -z rabbitmq 5672; do echo waiting for rabbitmq; sleep 2; done
       containers:
       - name: grpc-server
-        image: 34.16.70.73:5000/go-grpc-server:201901271
+        image: 34.16.70.73.nip.io:5000/go-grpc-server:201901271
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 50051
@@ -50,7 +50,7 @@ spec:
         - name: RABBITMQ_VHOST
           value: "warreports"
       - name: grpc-server-sidecar
-        image: 34.16.70.73:5000/go-grpc-server:201901271
+        image: 34.16.70.73.nip.io:5000/go-grpc-server:201901271
         imagePullPolicy: IfNotPresent
         command:
         - sh

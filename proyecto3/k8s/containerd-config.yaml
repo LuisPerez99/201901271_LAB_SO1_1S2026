@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: containerd-configurator
+  namespace: proyecto3
+spec:
+  selector:
+    matchLabels:
+      name: containerd-configurator
+  template:
+    metadata:
+      labels:
+        name: containerd-configurator
+    spec:
+      hostPID: true
+      hostNetwork: true
+      tolerations:
+      - operator: Exists
+      containers:
+      - name: configurator
+        image: alpine:3.20
+        securityContext:
+          privileged: true
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          set -e
+          mkdir -p /host/etc/containerd/certs.d/34.16.70.73:5000
+          cp /etc/zot-ca/ca.crt /host/etc/containerd/certs.d/34.16.70.73:5000/ca.crt
+          cat <<EOF > /host/etc/containerd/certs.d/34.16.70.73:5000/hosts.toml
+          server = "https://34.16.70.73:5000"
+
+          [host."https://34.16.70.73:5000"]
+            capabilities = ["pull", "resolve"]
+          EOF
+          nsenter -t 1 -m -u -i -n -- systemctl restart containerd
+          
+          echo "Configuración de CA aplicada y containerd reiniciado"
+          sleep infinity
+        volumeMounts:
+        - name: host-etc
+          mountPath: /host/etc/containerd/certs.d
+        - name: zot-ca
+          mountPath: /etc/zot-ca
+          readOnly: true
+      volumes:
+      - name: host-etc
+        hostPath:
+          path: /etc/containerd/certs.d
+      - name: zot-ca
+        secret:
+          secretName: zot-ca-cert

@@ -1,0 +1,84 @@
+---
+# DaemonSet to install Zot CA certificate on all nodes for containerd trust
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zot-ca-config
+  namespace: proyecto3
+data:
+  hosts.toml: |
+    [host."https://34.16.70.73:5000"]
+      capabilities = ["pull", "resolve"]
+      skip_verify = false
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: containerd-ca-installer
+  namespace: proyecto3
+spec:
+  selector:
+    matchLabels:
+      app: containerd-ca-installer
+  template:
+    metadata:
+      labels:
+        app: containerd-ca-installer
+    spec:
+      hostNetwork: true
+      hostPID: true
+      hostIPC: true
+      priorityClassName: system-node-critical
+      tolerations:
+      - operator: Exists
+        effect: NoSchedule
+      - operator: Exists
+        effect: NoExecute
+      containers:
+      - name: installer
+        image: busybox:1.35
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: host-root
+          mountPath: /host
+          mountPropagation: Bidirectional
+        - name: ca-cert
+          mountPath: /etc/ca-certs
+          readOnly: true
+        - name: config
+          mountPath: /etc/hosts-config
+          readOnly: true
+        command:
+        - sh
+        - -c
+        - |
+          set -e
+          echo "[containerd-ca-installer] Installing Zot CA certificate..."
+          
+          # Create cert directory
+          mkdir -p /host/etc/containerd/certs.d/34.16.70.73:5000
+          
+          # Copy CA certificate
+          cp /etc/ca-certs/ca.crt /host/etc/containerd/certs.d/34.16.70.73:5000/ca.crt
+          echo "[containerd-ca-installer] CA certificate installed"
+          
+          # Copy hosts.toml if containerd v2
+          if [ -d /host/etc/containerd/certs.d ]; then
+            cp /etc/hosts-config/hosts.toml /host/etc/containerd/certs.d/34.16.70.73:5000/hosts.toml || true
+            echo "[containerd-ca-installer] hosts.toml installed"
+          fi
+          
+          echo "[containerd-ca-installer] Setup complete, container will keep running..."
+          sleep infinity
+      volumes:
+      - name: host-root
+        hostPath:
+          path: /
+      - name: ca-cert
+        secret:
+          secretName: zot-ca-cert
+      - name: config
+        configMap:
+          name: zot-ca-config

@@ -25,10 +25,10 @@ spec:
         app: rust-api
     spec:
       imagePullSecrets:
-      - name: zot-credentials
+      - name: zot-regcred
       containers:
       - name: api
-        image: 34.16.70.73:5000/api-rust:201901271
+        image: 34.16.70.73.nip.io:5000/rust-api:201901271
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3000

@@ -10,37 +10,46 @@
 
 ## Fase 1: Build y Push de Imágenes
 
+### IP del registro ZOT
+```bash
+ZOT_HOST=<IP_VM>
+```
+
 ### Rust API
 ```bash
 cd proyecto3/api
-docker build -t rust-api:v1 .
+docker build -t rust-api:201901271 .
 # Tag y push a Zot
-docker tag rust-api:v1 zot:5000/api-rust:v1
-docker push zot:5000/api-rust:v1
+docker tag rust-api:201901271 ${ZOT_HOST}:5000/rust-api:201901271
+docker push ${ZOT_HOST}:5000/rust-api:201901271
 ```
 
 ### Go API Client
 ```bash
 cd proyecto3/go-api-client
-docker build -t go-api-client:v1 .
-docker tag go-api-client:v1 zot:5000/go-api-client:v1
-docker push zot:5000/go-api-client:v1
+docker build \
+  --build-context sharedpb=../go-shared-pb \
+  -t go-api-client:201901271 \
+  .
+docker tag go-api-client:201901271 ${ZOT_HOST}:5000/go-api-client:201901271
+docker push ${ZOT_HOST}:5000/go-api-client:201901271
 ```
 
 ### Go gRPC Server
 ```bash
 cd proyecto3/go-grpc-server
-docker build -t go-grpc-server:v1 .
-docker tag go-grpc-server:v1 zot:5000/go-grpc-server:v1
-docker push zot:5000/go-grpc-server:v1
+docker build \
+  --build-context sharedpb=../go-shared-pb \
+  -t ${ZOT_HOST}:5000/go-grpc-server:201901271 \
+  .
+docker push ${ZOT_HOST}:5000/go-grpc-server:201901271
 ```
 
 ### Go Consumer
 ```bash
 cd proyecto3/go-consumer
-docker build -t go-consumer:v1 .
-docker tag go-consumer:v1 zot:5000/go-consumer:v1
-docker push zot:5000/go-consumer:v1
+docker build -t ${ZOT_HOST}:5000/go-consumer:201901271 .
+docker push ${ZOT_HOST}:5000/go-consumer:201901271
 ```
 
 ## Fase 2: Deploy a Kubernetes

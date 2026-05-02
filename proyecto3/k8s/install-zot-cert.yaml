@@ -18,24 +18,28 @@ spec:
       hostNetwork: true
       initContainers:
       - name: install-cert
-        image: alpine
+        image: alpine:3.20
         command: ["/bin/sh", "-c"]
         args:
           - |
-            apk add --no-cache curl
-            # Esperar a que containerd esté listo
-            sleep 5
-            # Configurar containerd para confiar en el certificado autofirmado
-            # Crear directorio de configuración si no existe
-            mkdir -p /tmp/containerd-config
-            # Para GKE, necesitamos configurar el registro en containerd.conf.toml
-            # Alternativamente, podemos deshabilitar la verificación SSL para Zot
-            echo "Esperando a que las imágenes se descarguen..."
+            set -e
+            mkdir -p /host/etc/containerd/certs.d/34.16.70.73:5000
+            cp /zot-cert/ca.crt /host/etc/containerd/certs.d/34.16.70.73:5000/ca.crt
+            cat <<EOF > /host/etc/containerd/certs.d/34.16.70.73:5000/hosts.toml
+            server = "https://34.16.70.73:5000"
+
+            [host."https://34.16.70.73:5000"]
+              capabilities = ["pull", "resolve"]
+            EOF
+            nsenter -t 1 -m -u -i -n -- systemctl restart containerd
+            echo "Zot CA instalado en el nodo"
             sleep infinity
         volumeMounts:
         - name: zot-cert-vol
-          mountPath: /tmp/zot.crt
-          subPath: zot.crt
+          mountPath: /zot-cert
+          readOnly: true
+        - name: host-certs
+          mountPath: /host/etc/containerd/certs.d
         securityContext:
           privileged: true
       containers:
@@ -45,9 +49,6 @@ spec:
       - name: zot-cert-vol
         secret:
           secretName: zot-ca-cert
-      - name: node-certs
+      - name: host-certs
         hostPath:
-          path: /usr/local/share/ca-certificates
-      - name: host-systemctl
-        hostPath:
-          path: /usr/bin/systemctl
+          path: /etc/containerd/certs.d

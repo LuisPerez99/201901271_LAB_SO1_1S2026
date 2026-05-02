@@ -60,16 +60,30 @@ sudo chmod +x /usr/local/bin/zot
 zot --version
 ```
 
-### 1.3 Generar Certificados HTTPS Autofirmados
+### 1.3 Generar Certificados HTTPS con CA Confiable
 
 ```bash
 # En la VM Zot:
 mkdir -p /var/lib/zot/certs
 
-# Generar certificado autofirmado válido 365 días
-openssl req -x509 -newkey rsa:4096 -keyout /var/lib/zot/certs/key.pem \
-  -out /var/lib/zot/certs/cert.pem -days 365 -nodes \
-  -subj "/CN=zot.proyecto3.local/O=Proyecto3/C=GT"
+# Generar una CA local y emitir el certificado del registro
+openssl genrsa -out /var/lib/zot/certs/ca.key 4096
+openssl req -x509 -new -nodes -key /var/lib/zot/certs/ca.key \
+  -sha256 -days 825 -out /var/lib/zot/certs/ca.crt \
+  -subj "/CN=Proyecto3-Zot-CA/O=Proyecto3/C=GT"
+
+openssl genrsa -out /var/lib/zot/certs/key.pem 4096
+openssl req -new -key /var/lib/zot/certs/key.pem \
+  -out /var/lib/zot/certs/server.csr \
+  -subj "/CN=${ZOT_HOST}/O=Proyecto3/C=GT"
+
+openssl x509 -req -in /var/lib/zot/certs/server.csr \
+  -CA /var/lib/zot/certs/ca.crt -CAkey /var/lib/zot/certs/ca.key \
+  -CAcreateserial -out /var/lib/zot/certs/cert.pem -days 825 -sha256
+
+# Verificar que el certificado del servidor fue firmado por la CA
+openssl x509 -in /var/lib/zot/certs/cert.pem -noout -issuer -subject
+openssl x509 -in /var/lib/zot/certs/ca.crt -noout -issuer -subject
 
 # Verificar
 openssl x509 -in /var/lib/zot/certs/cert.pem -text -noout | grep "Subject:\|Not Before\|Not After"
@@ -108,6 +122,8 @@ If you want a minimal, working HTTPS-enabled config for `v2.1.16` (no access-con
 
 Notes:
 - This minimal config starts Zot with HTTPS, basic htpasswd auth, and local filesystem storage.
+- Use the CA certificate (`ca.crt`) to trust Zot from Kubernetes nodes and local Docker clients; do not rely on `curl -k` except for debugging.
+- If `openssl x509 -in /var/lib/zot/certs/cert.pem -noout -issuer -subject` still shows the same issuer and subject, Zot is still serving a self-signed leaf cert and Kubernetes will keep rejecting it.
 - If you need advanced `access control` or `access log` configuration, copy the sample config from the Zot v2.1.16 release or the project documentation and adapt it. The schema names and casing must match the Zot binary; mismatches cause the service to fail with unmarshalling errors.
 - After editing, validate with `sudo /usr/local/bin/zot serve /etc/zot/config.json` and check `sudo journalctl -u zot -f` for runtime errors.
 
@@ -197,7 +213,7 @@ docker push ${ZOT_HOST}:5000/go-api-client:201901271
 
 # Go gRPC Server
 cd ../go-grpc-server
-cd go-grpc-server && docker build \
+docker build \
   --build-context sharedpb=../go-shared-pb \
   -t ${ZOT_HOST}:5000/go-grpc-server:201901271 \
   .
@@ -405,7 +421,7 @@ tail -f /var/log/zot/zot.log
 
 | Error | Causa | Solución |
 |-------|-------|----------|
-| Certificate verify failed | HTTPS self-signed | Usar `curl -k` o importar cert |
+| Certificate verify failed | CA no confiable o cert mal instalado | Instalar `ca.crt` en nodos/cliente o usar CA confiable |
 | 401 Unauthorized | Credenciales incorrectas | Verificar htpasswd, login nuevamente |
 | Connection refused | Zot no corriendo | `sudo systemctl restart zot` |
 | ImagePullBackOff en Pod | Secret de credentials faltante | Crear secret con kubectl |
@@ -454,7 +470,7 @@ sudo tar czf /mnt/backups/zot-config-$(date +%Y%m%d).tar.gz \
 ## Conclusión
 
 Una vez completados estos pasos:
-1. ✓ Zot HTTPS registry corriendo en GCP VM con certificado self-signed
+1. ✓ Zot HTTPS registry corriendo en GCP VM con certificado emitido por una CA confiable
 2. ✓ Todas 4 imágenes Docker (carnet 201901271) publicadas
 3. ✓ OCI Artifact (proyecto3-config.json) disponible para descarga
 4. ✓ Secretos de autenticación creados en cluster K8s

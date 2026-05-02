@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.4
 # Go API Client Multi-stage Dockerfile
-FROM golang:1.21-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 RUN apk --no-cache add ca-certificates
 

@@ -1,0 +1,17 @@
+{
+  "distSpecVersion": "1.1.0",
+  "storage": {
+    "rootDirectory": "/var/lib/zot"
+  },
+  "http": {
+    "address": "0.0.0.0",
+    "port": "5000",
+    "tls": {
+        "cert": "/etc/zot/certs/tls.crt",
+        "key": "/etc/zot/certs/tls.key"
+    }
+  },
+  "log": {
+    "level": "info"
+  }
+}
