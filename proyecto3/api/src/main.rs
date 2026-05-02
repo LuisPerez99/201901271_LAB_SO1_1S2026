@@ -23,6 +23,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(web::Data::new(app_state.clone()))
             .wrap(middleware::Logger::default())
+            .route("/", web::get().to(health_check))
             .route("/health", web::get().to(health_check))
             .route("/report", web::post().to(receive_report))
             .route("/grpc-201901271", web::post().to(receive_report))

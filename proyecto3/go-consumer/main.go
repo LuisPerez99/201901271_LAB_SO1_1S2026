@@ -155,7 +155,7 @@ func main() {
 		}
 
 		// Store in Valkey
-		key := fmt.Sprintf("%s:report:%s", consumerCountry, time.Now().Format("20060102150405"))
+		key := fmt.Sprintf("%s:report:%s", report.Country, time.Now().Format("20060102150405"))
 		report.ReceivedAt = time.Now().UTC().Format(time.RFC3339)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
